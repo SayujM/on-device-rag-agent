@@ -1,5 +1,25 @@
 ### Overall Approach & Key Considerations
 
+### Versioning Strategy
+
+To manage complexity and deliver functional increments, we will implement the RAG Agent in the following versions:
+
+*   **Version 1: RAG Agent with Chat Ability in English.**
+    *   **Focus:** Core RAG functionality for English text.
+    *   **Scope:** Implement Phase 1 (English content), Phase 2, Phase 3 (English responses), and Phase 4 (English context). Phase 0 (voice/multilingual) is deferred.
+
+*   **Version 2: Voice Features Added (English Only).**
+    *   **Focus:** Integrating voice input (STT) and output (TTS) for English.
+    *   **Scope:** Introduce Phase 0 specifically for English. Implement English STT and TTS, prioritizing low-latency, CPU-friendly models for multi-turn interactions. Voice cloning is not included.
+
+*   **Version 3: Support for Indian Languages (Especially Malayalam) Added.**
+    *   **Focus:** Extending all functionalities to support Malayalam for both text and voice.
+    *   **Scope:** Activate all multilingual aspects. Extend Phase 0 (STT/TTS) to support Malayalam. Update Phase 1 (Data Ingestion) for Malayalam text extraction, multilingual embedding, and Malayalam tokenization for BM25. Update Phase 2 & 3 (LLM Interaction) for Malayalam queries and responses. Voice cloning is not included.
+
+*   **Version 4: Voice Cloning Feature.**
+    *   **Focus:** Implementing user-specific voice adaptation/cloning.
+    *   **Scope:** This will be a dedicated phase or module, building upon the established voice and multilingual capabilities from previous versions. It will involve researching and integrating a suitable voice cloning/adaptation model that can run efficiently on the target device, and extending it to support Malayalam.
+
 Our strategy will focus on:
 *   **Modularity:** Breaking down the agent into distinct, testable components.
 *   **Efficiency:** Prioritizing libraries and techniques known for CPU performance and memory efficiency.
@@ -10,14 +30,30 @@ Our strategy will focus on:
 *   **LLM-driven Query Transformation:** Leveraging the `gemma-3n` model for dynamic and semantically varied query generation.
 *   **Semantic Caching:** Implementing a cache that understands query similarity, not just exact matches.
 *   **Personalization Hooks:** Laying the groundwork for user-specific context integration.
+*   **Voice Interaction:** Enabling natural language interaction through speech-to-text and text-to-speech.
+*   **Multilingual Support:** Specifically supporting Indian languages, with a focus on Malayalam, for both text and voice queries.
 
 ### Revised Implementation Plan
+
+#### Phase 0: User Interface & Interaction (Voice & Multilingual)
+
+*   **Step 0.1: Speech-to-Text (STT) Integration**
+    *   **Objective:** Convert spoken user queries into text.
+    *   **Considerations:** Focus on lightweight, CPU-friendly models. Explore local models (e.g., `Vosk`, `Whisper.cpp` if a very small quantized version is available and performs well on CPU) or consider a cloud API if absolutely necessary and within budget/resource constraints (though the prompt emphasizes "solution deployment device end" which implies local). Prioritize models with good Malayalam support.
+    *   **Output:** Textual representation of the user's spoken query.
+
+*   **Step 0.2: Text-to-Speech (TTS) Integration**
+    *   **Objective:** Convert the agent's textual response into spoken audio.
+    *   **Considerations:** Similar to STT, prioritize lightweight, CPU-friendly models or local libraries (e.g., `espeak-ng`, `pyttsx3` with a suitable backend, or small `Coqui TTS` models). Must support Malayalam.
+    *   **Output:** Audio representation of the agent's response.
+
 
 #### Phase 1: Data Ingestion & Core Indexing
 
 *   **Step 1.1: Document Loading & Preprocessing**
     *   **Objective:** Extract raw text and images from PDF files.
     *   **Implementation:** Use a library like `PyMuPDF` (fitz) for efficient PDF parsing. It can extract both text and images.
+    *   **Update:** Emphasize robust handling of multilingual text, especially Malayalam, during PDF parsing. Ensure `PyMuPDF` correctly extracts Malayalam characters.
     *   **Output:** Raw text content per page, and image files (e.g., PNG/JPEG) saved to a designated local directory for visual inspection.
     *   **Robustness:** Implement error handling for corrupted PDFs or missing files.
 
@@ -37,6 +73,7 @@ Our strategy will focus on:
 *   **Step 1.4: Embedding Model Selection & Setup**
     *   **Objective:** Generate dense vector embeddings for all text chunks (including image descriptions).
     *   **Selection:** Choose a compact, performant `sentence-transformers` model (e.g., `all-MiniLM-L6-v2` or similar) that runs efficiently on CPU.
+    *   **Update:** **Crucial:** Select a compact, performant *multilingual* `sentence-transformers` model (e.g., `paraphrase-multilingual-MiniLM-L12-v2` or similar) that runs efficiently on CPU and has strong performance for Indian languages, particularly Malayalam. This model will be used for all text chunks (including image descriptions) and queries.
     *   **Implementation:** Load the embedding model and create embeddings for each chunk.
     *   **Robustness:** Consider batching embedding generation for efficiency.
 
@@ -48,6 +85,7 @@ Our strategy will focus on:
 *   **Step 1.6: BM25 Indexing**
     *   **Objective:** Create a sparse index for keyword-based search.
     *   **Implementation:** Use the `rank_bm25` library to build a BM25 index over the text content of all chunks.
+    *   **Update:** Ensure the `rank_bm25` library (or an alternative if needed) correctly handles Malayalam tokenization and indexing for sparse retrieval. This might require a custom tokenizer if `rank_bm25`'s default tokenization is not optimal for Malayalam.
     *   **Storage:** Persist the BM25 index (e.g., using Python's `pickle` module) to disk for quick loading.
     *   **Robustness:** Handle large indices efficiently.
 
@@ -56,6 +94,7 @@ Our strategy will focus on:
 *   **Step 2.1: Query Transformation Module (LLM-based)**
     *   **Objective:** Rephrase the user's initial query into multiple semantically different, affirmative forms suitable for retrieval.
     *   **Implementation:** Utilize the `gemma-3n` GGUF model (the one we just got working) to generate 3-5 diverse rephrased queries from the original user query. This will involve crafting a specific prompt for the `gemma-3n` model to guide this rephrasing.
+    *   **Update:** The `gemma-3n` GGUF model must be capable of understanding and generating queries in Malayalam. Prompt engineering will be critical to guide it to rephrase queries in Malayalam when the original query is in Malayalam.
     *   **Agentic RAG:** This module will be a key part of the agent's iterative process, generating multiple queries for parallel or sequential retrieval attempts.
 
 *   **Step 2.2: Dense Retriever**
@@ -96,6 +135,7 @@ Our strategy will focus on:
     *   **Objective:** Generate a coherent and accurate answer using the Gemma GGUF model based on the user query and retrieved context.
     *   **Implementation:** Integrate the Gemma GGUF model (from our `gemma_gguf_loader.py`) into the `response_generation_node`.
     *   **Prompt Engineering:** Craft a sophisticated prompt that instructs Gemma to synthesize information from the retrieved chunks to answer the user's original query, potentially incorporating `personalization_context`. The prompt should emphasize grounding the answer in the provided context.
+    *   **Update:** The Gemma GGUF model needs to generate coherent and accurate answers in Malayalam when the query and context are in Malayalam. Prompt engineering will be key here as well.
 
 *   **Step 3.3: Initial Agent Testing**
     *   **Objective:** Verify the end-to-end functionality of the RAG agent with a single query.
@@ -120,3 +160,5 @@ Our strategy will focus on:
 *   **Quantization Levels:** For GGUF models (Gemma and VLM), we can experiment with different quantization levels (e.g., Q4_K_M, Q5_K_M, Q8_0) to find the optimal balance between performance and quality for your specific desktop.
 *   **Batch Processing:** Explore opportunities to batch inputs for embedding generation and VLM inference to improve throughput.
 *   **Streamlit/CLI Interface:** Once the core agent is functional, we can discuss adding a simple Streamlit UI or a robust CLI interface for interaction.
+*   **Multilingual Model Evaluation:** Thoroughly evaluate the chosen STT, TTS, embedding, and LLM models for their performance and accuracy specifically with Malayalam, given the resource constraints.
+*   **Tokenization for Indian Languages:** Pay special attention to tokenization strategies for Malayalam in both embedding and sparse retrieval, as standard English tokenizers may not be optimal.
