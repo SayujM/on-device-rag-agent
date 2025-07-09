@@ -27,3 +27,4 @@ transformers
 trustcall
 wikipedia
 PyMuPDF
+pytesseract
