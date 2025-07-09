@@ -1,6 +1,9 @@
 #LLM Model files
 gemma-3n-E4B-it-Q4_K_M.gguf
 
+# Data folders to avoid
+pdf_files/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
