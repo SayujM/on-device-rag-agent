@@ -28,3 +28,6 @@ trustcall
 wikipedia
 PyMuPDF
 pytesseract
+langchain-text-splitters
+chromadb
+protobuf==3.20.3
