@@ -14,7 +14,7 @@
 *   **Efficiency:** Prioritizing libraries and techniques known for CPU performance and memory efficiency.
 *   **LangGraph Orchestration:** Using LangGraph to manage the complex flow of the agent, including iterative retrieval and conditional logic.
 *   **Hybrid Search:** Combining the strengths of dense (semantic) and sparse (keyword) retrieval.
-*   **Multi-modal Handling:** Separately processing text and images, and integrating a VLM.
+*   **Multi-modal Handling:** Separately processing text and images. VLM integration for generating image descriptions has been identified as requiring significant further research and development due to current model limitations (e.g., hallucinations), thus it is deferred to a later version.
 *   **Persistence:** Implementing caching for retrieved results to minimize redundant work.
 *   **LLM-driven Query Transformation:** Leveraging the `gemma-3n` model for dynamic and semantically varied query generation.
 *   **Semantic Caching:** Implementing a cache that understands query similarity, not just exact matches.
@@ -24,25 +24,24 @@
 
 *   **Step 1.1: Document Loading & Preprocessing**
     *   **Objective:** Extract raw text and images from PDF files.
-    *   **Implementation:** Use a library like `PyMuPDF` (fitz) for efficient PDF parsing. It can extract both text and images.
+    *   **Implementation:** Use a library like `PyMuPDF` (fitz) for efficient PDF parsing. It can extract both text and images. For scanned documents, OCR (e.g., Tesseract) will be used to extract text from rendered page images if `PyMuPDF`'s text extraction is insufficient.
     *   **Output:** Raw text content per page, and image files (e.g., PNG/JPEG) saved to a designated local directory for visual inspection.
     *   **Robustness:** Implement error handling for corrupted PDFs or missing files.
 
-*   **Step 1.2: Visual Language Model (VLM) Integration**
+*   **Step 1.2: Visual Language Model (VLM) Integration (Deferred for Version 1)**
     *   **Objective:** Generate textual descriptions for extracted images.
-    *   **Selection:** Research and select a VLM suitable for modest desktop resources. Options include smaller, quantized versions of models like BLIP, LLaVA, or Mini-GPT4 if available in GGUF or a similar CPU-friendly format. We will need to find a specific model and its GGUF version.
-    *   **Implementation:** Integrate the chosen VLM to process each extracted image and output a descriptive caption.
-    *   **Robustness:** Handle cases where VLM inference fails or produces low-quality descriptions.
+    *   **Challenge Faced:** Initial attempts with LLaVA-v1.5-7B (Q4_K_M GGUF) demonstrated significant limitations, including severe hallucinations and inability to accurately interpret document-specific visual content (e.g., misinterpreting text-only pages as book covers, or misrepresenting graph details).
+    *   **Decision:** Due to these limitations and the need for substantial further research, model selection, and fine-tuning to achieve reliable performance for document image understanding, VLM integration is deferred to a later version. For Version 1, the RAG agent will primarily rely on text-based content.
 
 *   **Step 1.3: Chunking Strategy**
     *   **Objective:** Divide processed text and image descriptions into meaningful, retrievable chunks with rich metadata.
     *   **Text Chunking:** Implement a strategy (e.g., fixed-size with overlap, or more advanced semantic chunking if feasible) for text content.
-    *   **Image Chunking:** Treat VLM-generated image descriptions as text and chunk them similarly, ensuring metadata links back to the original image and its source.
+    *   **Image Chunking:** (Deferred for Version 1) Treat VLM-generated image descriptions as text and chunk them similarly, ensuring metadata links back to the original image and its source. This step is dependent on successful VLM integration.
     *   **Metadata:** Each chunk (text or image description) must include metadata such as: `source_file`, `page_number`, `chunk_id`, `chunk_type` (text/image), and for images, `image_id`.
     *   **Robustness:** Experiment with chunk sizes and overlap to optimize retrieval performance and minimize noise.
 
 *   **Step 1.4: Embedding Model Selection & Setup**
-    *   **Objective:** Generate dense vector embeddings for all text chunks (including image descriptions).
+    *   **Objective:** Generate dense vector embeddings for all text chunks. (Image descriptions are deferred for Version 1).
     *   **Selection:** Choose a compact, performant `sentence-transformers` model (e.g., `all-MiniLM-L6-v2` or similar) that runs efficiently on CPU. (Note: For Version 1, this would be an English-focused model).
     *   **Implementation:** Load the embedding model and create embeddings for each chunk.
     *   **Robustness:** Consider batching embedding generation for efficiency.
@@ -94,7 +93,7 @@
         *   `personalization_node`: Reads user profile/memory and injects context into the state.
         *   `query_transform_node`: Calls Step 2.1, potentially using `personalization_context`.
         *   `hybrid_retrieval_node`: Calls Steps 2.2, 2.3, 2.4 (and incorporates Step 2.5 for caching).
-        *   `vlm_processing_node`: (Optional, if VLM processing is done on-demand for retrieved image chunks).
+        *   `vlm_processing_node`: (Deferred for Version 1)
         *   `iterative_query_node`: Analyzes retrieved chunks; if unsatisfactory, generates new transformed queries (via `query_transform_node`) and routes back to `hybrid_retrieval_node`. This node will use the `gemma-3n` model to assess retrieval quality and decide on re-querying.
         *   `response_generation_node`: Calls Step 3.2.
     *   **Edges & Conditional Routing:** Define the flow between nodes, including conditional edges for iterative retrieval based on the quality of initial results.
@@ -136,5 +135,6 @@
 *   **Voice Interaction** (from Overall Approach)
 *   **Multilingual Support** (from Overall Approach)
 *   All "Update" notes related to multilingual capabilities within Phase 1, 2, and 3.
+*   **VLM Integration:** Due to significant challenges with current model performance (e.g., hallucinations) for document image understanding, VLM integration for generating image descriptions is deferred to a later version.
 *   **Multilingual Model Evaluation** (from Robustness & Resource Considerations)
 *   **Tokenization for Indian Languages** (from Robustness & Resource Considerations)
