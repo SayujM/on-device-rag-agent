@@ -1,5 +1,7 @@
-#LLM Model files
+#LLM VLM Model related files
 gemma-3n-E4B-it-Q4_K_M.gguf
+llava-v1.5-7b-Q4_K_M.gguf
+llava-v1.5-7b-mmproj-model-f16.gguf
 
 # Data folders to avoid
 pdf_files/
