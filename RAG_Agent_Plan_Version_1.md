@@ -53,7 +53,8 @@
 
 *   **Step 1.6: BM25 Indexing**
     *   **Objective:** Create a sparse index for keyword-based search.
-    *   **Implementation:** Use the `rank_bm25` library to build a BM25 index over the text content of all chunks. (Note: For Version 1, tokenization would be optimized for English).
+    *   **Implementation:** Use the `rank_bm25` library to build a BM25 index over the text content of all chunks.
+    *   **Tokenization Strategy (Version 1):** For Version 1, tokenization is optimized for **English** using a simple, custom tokenizer (lowercase, punctuation removal, basic stop word filtering). This approach is chosen for its simplicity, transparency, and minimal dependencies. For future versions, especially when adding support for **Indian Languages**, upgrading to a more robust library like **NLTK** for linguistically-aware tokenization and lemmatization will be critical to improve search accuracy.
     *   **Storage:** Persist the BM25 index (e.g., using Python's `pickle` module) to disk for quick loading.
     *   **Robustness:** Handle large indices efficiently.
 
