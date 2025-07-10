@@ -121,6 +121,7 @@
 
 #### Robustness & Resource Considerations (for Version 1)
 
+*   **LLM Memory Management:** When using `llama-cpp-python` in standalone scripts, a benign `TypeError` may be observed on exit. This is due to a race condition in the library's garbage collection and does not affect the script's output. This will be resolved in the final application (e.g., the Streamlit app) by implementing explicit model lifecycle management to ensure the model is loaded once and shut down cleanly.
 *   **Error Handling & Logging:** Implement comprehensive `try-except` blocks and detailed logging at each stage to facilitate debugging and monitor agent behavior.
 *   **Configuration Management:** Use a `config.yaml` or similar file to manage all configurable parameters (model paths, chunk sizes, database paths, VLM parameters, etc.).
 *   **Resource Monitoring:** Advise on using system monitoring tools (e.g., `htop`, `nvidia-smi` if GPU is used for VLM) to track CPU, RAM, and VRAM usage during development and testing.
