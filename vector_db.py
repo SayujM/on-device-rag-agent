@@ -84,7 +84,10 @@ def populate_vector_db(client: chromadb.PersistentClient, embeddings_data_path: 
     # --- End Refinement ---
 
     print(f"Adding {len(ids)} embeddings to collection '{collection_name}'...")
-    collection = client.get_or_create_collection(name=collection_name)
+    collection = client.get_or_create_collection(
+        name=collection_name, 
+        metadata={"hnsw:space": "cosine"}  # Specify cosine similarity
+    )
 
     # ChromaDB add method requires lists of ids, embeddings, metadatas, and documents
     try:
@@ -145,7 +148,8 @@ if __name__ == "__main__":
     print("\n--- Testing Query Functionality ---")
     # Import and load the embedding model here for query embedding
     from embedding_model import load_embedding_model # Import the function
-    query_embedding_model = load_embedding_model()
+    EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+    query_embedding_model = load_embedding_model(EMBEDDING_MODEL_NAME)
 
     if query_embedding_model:
         test_query = "What is the Toyota Way model?"
