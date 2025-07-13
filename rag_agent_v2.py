@@ -289,11 +289,25 @@ def rewrite_query_node(state: AgentState) -> dict:
     """
     print("--- Node: Rewriting Query ---")
     failed_queries = "\n- ".join(state.transformed_queries)
+    chat_history = state.chat_history
+    personalization_context = state.personalization_context
+
+    formatted_history = prepare_contextual_history(chat_history)
+
     prompt = f"""<start_of_turn>user
-    You are a search expert. A user asked: '{state.initial_query}'.
-    Our attempt to search with these related queries failed:
+    You are a search expert. The user's original question was: '{state.initial_query}'.
+    The current conversation history is:
+    {formatted_history}
+
+    User Profile:
+    {json.dumps(personalization_context, indent=2)}
+
+    Our previous attempts to search with these related queries failed:
     - {failed_queries}
-    Generate a single, new search query that takes a different approach to finding the answer. Do not repeat previous queries.<end_of_turn>
+
+    Considering the entire conversation and the user's profile, generate a single, new search query that takes a different approach to finding the answer.
+    Crucially, ensure the new query maintains the original conversational context and does not introduce unrelated topics.
+    Do not repeat previous queries.<end_of_turn>
     <start_of_turn>model
     """
     response = llm(prompt=prompt, max_tokens=100, stop=["<end_of_turn>"])
@@ -496,7 +510,7 @@ def run_agent():
             print(f"Generated new conversation ID: {thread_id}")
 
         while True:
-            query = input("You: ")
+            query = input("Your query (respond with exit or quit to quit): ")
             if query.lower() in ["exit", "quit"]:
                 break
             
