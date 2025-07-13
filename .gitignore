@@ -6,6 +6,7 @@ llava-v1.5-7b-mmproj-model-f16.gguf
 # Data folders to avoid
 pdf_files/
 chroma_db/
+retrieval_cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
