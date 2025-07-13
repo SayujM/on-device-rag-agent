@@ -1,0 +1,11 @@
+{
+    "name": "Sayuj",
+    "preferences": {
+        "tone": "formal",
+        "format": "bullet points"
+    },
+    "past_interactions": [
+        "Asked about the Toyota Production System",
+        "Interested in lean manufacturing principles"
+    ]
+}
