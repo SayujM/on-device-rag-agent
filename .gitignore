@@ -7,6 +7,10 @@ llava-v1.5-7b-mmproj-model-f16.gguf
 pdf_files/
 chroma_db/
 retrieval_cache/
+langgraph_checkpoints/
+
+# Databases used in the program
+user_profiles.db
 
 # API related
 .langgraph_api/
