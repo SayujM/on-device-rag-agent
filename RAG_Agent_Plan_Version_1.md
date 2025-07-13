@@ -140,3 +140,44 @@
 *   **VLM Integration:** Due to significant challenges with current model performance (e.g., hallucinations) for document image understanding, VLM integration for generating image descriptions is deferred to a later version.
 *   **Multilingual Model Evaluation** (from Robustness & Resource Considerations)
 *   **Tokenization for Indian Languages** (from Robustness & Resource Considerations)
+
+---
+
+### Version 2: Advanced Multi-User Conversational Agent
+
+**Focus:** Evolving the agent from a single-query tool to a scalable, multi-user, multi-conversation platform with robust memory and intelligent query routing.
+
+**Core Features & Design Decisions:**
+
+1.  **Decoupled User and Conversation Memory (The "Two-Storage" Model):**
+    *   **Requirement:** A user's identity and preferences must be permanent and independent of any single conversation. A user should be able to have multiple, separate, simultaneous conversations.
+    *   **Design Decision:** We will use two distinct storage systems:
+        *   **Profile Store (Long-Term Memory):** A persistent, transactional key-value store (e.g., a dedicated `sqlite3` database with a `user_profiles` table) to hold the `personalization_context` for each `user_id`. This is the single source of truth for a user's profile.
+        *   **Conversation Checkpointer (Medium-Term Memory):** LangGraph's built-in `SqliteSaver` will be used to manage the `chat_history` for individual conversations, keyed by a unique `thread_id`. This allows conversations to be paused and resumed reliably.
+    *   **Benefit:** This architecture provides maximum scalability and correctly separates permanent user data from transient conversation data.
+
+2.  **Intelligent Query Routing:**
+    *   **Requirement:** The agent must differentiate between queries that require document retrieval (RAG) and simple conversational queries (e.g., "Hello", "Thank you").
+    *   **Design Decision:** A new `route_query_node` will be the first step in the graph. It will use the LLM to classify the user's input as either `rag_query` or `conversational_query`. The graph will then branch, invoking the full RAG pipeline only when necessary.
+    *   **Benefit:** This makes the agent more efficient and natural. It avoids unnecessary, costly retrieval work for simple interactions and provides more appropriate responses for conversational turns.
+
+3.  **LLM-Powered Context Summarization:**
+    *   **Requirement:** The agent's memory, both for long-term personalization and short-term conversation history, must not exceed the LLM's context window.
+    *   **Design Decision:** We will implement two forms of summarization:
+        *   **Chat History Summarization:** For long conversations, a helper function (`prepare_contextual_history`) will be called by nodes to create a condensed summary of older messages, which is then combined with the most recent messages. This provides the LLM with relevant context without overflowing its prompt.
+        *   **Personalization Summarization:** A new `update_personalization_node` will use the LLM at the end of each turn to intelligently condense the latest interaction into the user's long-term profile summary. This allows the user's profile to evolve without growing infinitely.
+    *   **Benefit:** The agent can have infinitely long conversations and build a rich user profile over time without ever failing due to context window limitations.
+
+4.  **Robust, Stateful Graph Execution:**
+    *   **Requirement:** The agent must be resilient to crashes and ensure that user data is not lost.
+    *   **Design Decision:** By using LangGraph's checkpointer for conversation history and a transactional SQLite database for user profiles, all I/O operations are robust. The checkpointer allows a conversation to be resumed even if the application crashes mid-turn.
+    *   **Benefit:** High reliability and data integrity, which are critical for a production-ready application.
+
+**New Agent Workflow:**
+
+1.  **Input:** The application provides a `user_id` and a `thread_id` with the user's query.
+2.  **Load Profile:** A `load_user_profile_node` reads the user's permanent profile from the Profile Store (SQLite) using the `user_id`.
+3.  **Route Query:** The `route_query_node` classifies the query.
+4.  **Branch:** The graph proceeds down either the RAG path or the simple conversational path.
+5.  **Update & Save:** After a response is generated, the `update_history_and_profile_node` runs. It updates the `chat_history` in the state and uses the LLM to update the `personalization_context`. It then saves the updated profile back to the Profile Store.
+6.  **Cleanup & Checkpoint:** A final `cleanup_state_node` removes temporary data from the state before the LangGraph checkpointer automatically saves the remaining state (containing the updated `chat_history`) keyed by the `thread_id`.
