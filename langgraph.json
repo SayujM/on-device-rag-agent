@@ -1,0 +1,11 @@
+{
+    "dockerfile_lines": [],
+    "graphs": {
+      "rag_agent": "./langchain_studio_entrypoint.py:app"
+    },
+    "env": "./.env",
+    "python_version": "3.13",
+    "dependencies": [
+      "."
+    ]
+  }
