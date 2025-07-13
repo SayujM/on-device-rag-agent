@@ -6,7 +6,7 @@ from collections import defaultdict
 # Local module imports
 from vector_db import get_chroma_client, COLLECTION_NAME
 from embedding_model import load_embedding_model
-from bm25_indexer import tokenize_text
+from text_utils import tokenize_text # Import from the new utility file
 
 class HybridRetriever:
     """
