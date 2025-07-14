@@ -210,7 +210,8 @@ if __name__ == "__main__":
 
     # --- Run the Agent ---
     print("\n--- Running RAG Agent ---")
-    inputs = {"original_query": "What are the core principles of the Toyota Production System?"}
+    # inputs = {"original_query": "What are the core principles of the Toyota Production System?"}
+    inputs = {"original_query": "What are the four Ps of the Toyota Way?"}
     final_state = app.invoke(inputs)
 
     print("\n--- Agent Run Complete ---")
