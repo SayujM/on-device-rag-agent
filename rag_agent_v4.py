@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import sqlite3
 from typing import List
@@ -22,6 +23,148 @@ from pdf_processor import process_pdf
 import pdf_manager # New import
 
 load_dotenv()
+
+PDF_SUMMARIES = {
+    "ELECTRIC_CHARGES_AND_FIELDS.pdf": (
+        "Topics included: Electric charges and their properties, conductors and insulators, "
+        "charging by induction, Coulomb's Law, the principle of superposition for forces between multiple charges, "
+        "electric field, electric field lines, electric dipole, electric field due to a point charge, "
+        "electric field due to an electric dipole (on axial and equatorial lines), "
+        "torque on an electric dipole in a uniform electric field, "
+        "continuous charge distribution (linear, surface, and volume charge density), "
+        "Gauss's Law and its applications (electric field due to an infinitely long straight uniformly charged wire, "
+        "uniformly charged infinite plane sheet, and uniformly charged thin spherical shell)."
+    ),
+    "The-toyota-way-second-edition-01_chapter_1.pdf": (
+        "Topics included: The Toyota Way philosophy, operational excellence, "
+        "annual net income/loss of major automakers (Toyota, Ford, Volkswagen, General Motors, Honda) from 2004-2018, "
+        "vehicle quality and long-term reliability ratings, "
+        "the Toyota Production System (TPS), and scientific thinking as applied to problem-solving and continuous "
+        "improvement within an organization."
+    ),
+    "The-toyota-way-second-edition-03_chapter_3.pdf": (
+        "Topics included: Genchi Genbutsu (go and see for yourself) as a Toyota Way principle, "
+        "practical application of Genchi Genbutsu for problem-solving and decision-making, "
+        "the importance of understanding the 'gemba' (the actual place where work is done), "
+        "examples of Toyota's leaders and their commitment to Genchi Genbutsu, "
+        "the contrast between Toyota's approach and common Western management practices, "
+        "Nemawashi (consensus building) and its role in decision-making, "
+        "and A3 reports as a tool for structured problem-solving and communication."
+    ),
+    "The-toyota-way-second-edition-02_chapter_2.pdf": (
+        "Topics included: The Toyota Way 2001 values (Continuous Improvement and Respect for People), "
+        "the Toyota Production System (TPS) as the operational system, "
+        "historical context of TPS development (Kiichiro Toyoda, Eiji Toyoda, Taiichi Ohno), "
+        "the two pillars of TPS: Just-in-Time (JIT) and Jidoka (automation with a human touch), "
+        "Heijunka (production leveling), Standardized Work, Kaizen (continuous improvement), "
+        "Lean manufacturing principles, and the evolution of the Toyota Way philosophy."
+    ),
+    "The-toyota-way-second-edition-00_chapter_preface.pdf": (
+        "Topics included: Introduction to the second edition of 'The Toyota Way', "
+        "the evolution of Toyota and the book's content since the first edition, "
+        "the concept of operational excellence as a strategic weapon, "
+        "the enduring relevance of the Toyota Way principles for various organizations, "
+        "and a brief overview of the book's structure and updated content, "
+        "including new insights into Toyota's long-term thinking and adaptability."
+    ),
+    "The-toyota-way-second-edition-06_chapter_6.pdf": (
+        "Topics included: Standardization as a foundation for continuous improvement and quality, "
+        "the importance of stable processes, "
+        "visual management, "
+        "methods for creating and maintaining standards (e.g., standard work sheets), "
+        "and how standardization supports problem-solving and training within the Toyota Production System."
+    ),
+    "The-toyota-way-second-edition-05_chapter_5.pdf": (
+        "Topics included: Building a culture of stopping to fix problems to get quality right the first time (Jidoka), "
+        "Andon cords/lights as a system to signal abnormalities, "
+        "the importance of immediate problem-solving at the source, "
+        "root cause analysis, "
+        "and integrating quality control into every step of the process rather than inspecting at the end."
+    ),
+    "The-toyota-way-second-edition-04_chapter_4.pdf": (
+        "Topics included: Creating continuous process flow to bring problems to the surface, "
+        "the concept of one-piece flow, "
+        "reducing work-in-process (WIP) inventory, "
+        "linking processes and people for smooth flow, "
+        "takt time as the rate of production needed to meet customer demand, "
+        "and the benefits of flow in identifying waste and improving efficiency."
+    ),
+    "The-toyota-way-second-edition-09_chapter_9.pdf": (
+        "Topics included: Use of visual control to support people in decision-making and problem-solving, "
+        "visual management principles, "
+        "the importance of displaying information clearly and simply, "
+        "examples of visual control systems (e.g., kanban, production boards), "
+        "and how visual aids help identify abnormalities and facilitate immediate corrective action."
+    ),
+    "The-toyota-way-second-edition-08_chapter_8.pdf": (
+        "Topics included: Building quality into the process (Jidoka principle), "
+        "the concept of 'stop and fix' errors immediately, "
+        "creating a culture where employees are empowered to halt production for quality issues, "
+        "the importance of root cause analysis and permanent countermeasures, "
+        "and examples of Toyota's commitment to quality at the source."
+    ),
+    "The-toyota-way-second-edition-07_chapter_7.pdf": (
+        "Topics included: Using pull systems to avoid overproduction, "
+        "Just-in-Time (JIT) production, "
+        "the concept of kanban as a pull signal, "
+        "the dangers of push systems and overproduction, "
+        "inventory reduction as a way to expose problems, "
+        "and how pull systems link processes based on actual customer demand."
+    ),
+    "The-toyota-way-second-edition-12_chapter_12.pdf": (
+        "Topics included: Developing exceptional people and teams, "
+        "the importance of continuous learning and growth for employees, "
+        "creating leaders who live the philosophy, "
+        "building a culture of respect and challenge, "
+        "and the role of leadership in fostering a lean environment."
+    ),
+    "The-toyota-way-second-edition-10_chapter_10.pdf": (
+        "Topics included: Developing stable and reliable suppliers as an extension of the enterprise, "
+        "long-term partnerships with suppliers, "
+        "supplier development and continuous improvement, "
+        "mutual learning and trust, "
+        "and integrating suppliers into the Toyota Production System."
+    ),
+    "The-toyota-way-second-edition-11_chapter_11.pdf": (
+        "Topics included: Growing leaders from within who understand the work, "
+        "live the philosophy, and teach it to others, "
+        "the importance of developing people through daily work, "
+        "creating a learning organization, "
+        "and the role of humility and continuous self-improvement for leaders."
+    ),
+    "The-toyota-way-second-edition-15_chapter_15.pdf": (
+        "Topics included: Hoshin Kanri (policy deployment) for aligning goals and ensuring systematic progress, "
+        "the importance of long-term vision in planning, "
+        "the catchball process for consensus building and communication across organizational levels, "
+        "and how aligned goals drive continuous improvement throughout the enterprise."
+    ),
+    "The-toyota-way-second-edition-14_chapter_14.pdf": (
+        "Topics included: Scientific thinking and continuous learning through iterative problem-solving (PDCA cycle), "
+        "the importance of deep observation and understanding the current condition, "
+        "setting challenging targets and experimenting to achieve them, "
+        "and developing a learning culture that embraces failures as opportunities for improvement."
+    ),
+    "The-toyota-way-second-edition-13_chapter_13.pdf": (
+        "Topics included: Respecting and challenging value chain partners (suppliers and dealers), "
+        "building long-term partnerships based on trust and mutual development, "
+        "supplier selection and integration into the lean system, "
+        "and helping partners improve their processes and capabilities to create a stable and efficient value chain."
+    ),
+    "The-toyota-way-second-edition-17_chapter_conclusion.pdf": (
+        "Topics included: Sustaining a lean transformation and the Toyota Way principles, "
+        "the challenge of integrating mechanistic and organic approaches to lean, "
+        "the importance of leadership commitment and consistent effort, "
+        "building a learning enterprise for continuous adaptation and improvement, "
+        "and summary of key takeaways from The Toyota Way philosophy."
+    ),
+    "The-toyota-way-second-edition-16_chapter_16.pdf": (
+        "Topics included: Learning your way to the future through bold strategy and combining large leaps with small steps, "
+        "the balance between incremental innovation and disruptive innovation, "
+        "Toyota's strategic approach to new technologies and market shifts, "
+        "the importance of a long-term vision in guiding innovation efforts, "
+        "and examples of strategic breakthroughs and challenges."
+    )
+}
 
 
 # --- Agent State Definition ---
@@ -62,8 +205,7 @@ hybrid_retriever = HybridRetriever(
     # pdf_specific_dir=PDF_SPECIFIC_DIR,
     embedding_model_name=EMBEDDING_MODEL_NAME
 )
-retrieval_cache = RetrievalCache(cache_dir=CACHE_DIR, embedding_model=embedding_model, similarity_threshold=0.67)
-print("-- All Components Initialized ---")
+retrieval_cache = None # Will be initialized in run_agent after PDF selection
 # --- Initialize Profile Manager and Checkpointer ---
 PROFILE_DB_PATH = os.path.join(BASE_DIR, "user_profiles.db")
 profile_manager = ProfileManager(db_path=PROFILE_DB_PATH)
@@ -141,8 +283,8 @@ def summarize_history_node(state: AgentState) -> dict:
     summary_response = llm(prompt=summary_prompt, max_tokens=200, stop=["<end_of_turn>"])
     summary = summary_response["choices"][0]["text"].strip()
 
-    formatted_recent = "\n".join([f"{msg.type}: {msg.content}" for msg in recent_messages])
-    full_summary = f"[Summary of earlier conversation: {summary}]\n\n[Recent messages:]\n{formatted_recent}"
+    formatted_recent = " ".join([f"{msg.type}: {msg.content}" for msg in recent_messages])
+    full_summary = f"[Summary of earlier conversation: {summary}] [Recent messages:]{formatted_recent}"
     return {"summarized_history": full_summary}
 
 def route_query_node(state: AgentState) -> dict:
@@ -182,8 +324,17 @@ def route_query_node(state: AgentState) -> dict:
     else:
         # If not relevant to docs, check if it's a simple conversation or needs web search
         conversational_check_prompt = f"""<start_of_turn>user
-        Given the user's question, is it a simple greeting, a question about the AI itself, or a general conversational query that does NOT require specific information retrieval from documents or the web?
-        Respond with 'conversational' or 'needs_web_search'.
+        You are a router for a larger AI system. Your job is to determine if a user's query is a simple conversational question or if it requires a web search.
+
+        A 'conversational' query includes:
+        - Greetings (e.g., "hello", "how are you?")
+        - Questions about you, the AI (e.g., "who are you?", "what can you do?")
+        - Simple statements of fact or opinion (e.g., "that's interesting", "I don't like that")
+        - Any other query that does not require looking up specific, external information.
+
+        A 'needs_web_search' query is one that asks for specific information that is likely not in your internal knowledge and is not in the provided documents (e.g., "what's the weather today?", "who won the world cup in 2022?").
+
+        Based on this, classify the following user question. Respond with ONLY 'conversational' or 'needs_web_search'.
 
         User Question: {state.initial_query}
 
@@ -351,7 +502,7 @@ def summarize_current_turn_node(state: AgentState) -> dict:
         return {"current_conversation_summary": ""}
 
     messages_str = "\n".join([f"{msg.type}: {msg.content}" for msg in state.current_turn_messages])
-
+    
     summary_prompt = f"""<start_of_turn>user
     Summarize the following sequence of events and observations from the current interaction turn. Focus on the key actions taken and their outcomes, especially regarding query transformation, document retrieval, and relevance grading.
 
@@ -538,7 +689,7 @@ def web_search_node(state: AgentState) -> dict:
             """
             summary_response = llm(prompt=summary_prompt, max_tokens=500, stop=["<end_of_turn>"])
             answer = summary_response["choices"][0]["text"].strip()
-            return {"final_answer": f"Here's what I found on the web regarding '{state.initial_query}':\n\n{answer}"}
+            return {"final_answer": f"Here's what I found on the web regarding '{state.original_query}':\n\n{answer}"}
         else:
             return {"final_answer": f"I couldn't find relevant information for '{search_query}' on the web."}
     except Exception as e:
@@ -574,29 +725,9 @@ def ingest_pdf_node(state: AgentState) -> dict:
     retrieval_cache = RetrievalCache(cache_dir=paths["retrieval_cache_dir"], embedding_model=embedding_model)
 
     # Update indexed_document_summary
-    # updated_indexed_document_summary = f"Documents now include content from {os.path.basename(pdf_path)}. Topics include [add general topics here]."
-    # updated_indexed_document_summary = (
-    # f"This agent currently has access to documents from '{os.path.basename(pdf_path)}'. "
-    # "Topics included: The Toyota Way philosophy, operational excellence, "
-    # "annual net income/loss of major automakers (Toyota, Ford, Volkswagen, General Motors, Honda) from 2004-2018, "
-    # "vehicle quality and long-term reliability ratings (J.D. Power, Dashboard Light) for various car brands "
-    # "(Toyota, Lexus, Scion, Porsche, Mercedes-Benz, Infiniti, Honda, Saab, Chevrolet, GMC, Jeep, Pontiac, Buick, "
-    # "Mitsubishi, Cadillac, Acura, Mercury, Hyundai, Lincoln, BMW, Dodge, Audi, Land Rover, Subaru, Volvo, Saturn, "
-    # "Jaguar, Nissan, Mazda, Ford, Kia, Chrysler, Volkswagen), "
-    # "the Toyota Production System (TPS), and scientific thinking as applied to problem-solving and continuous "
-    # "improvement within an organization."
-    # )
-    updated_indexed_document_summary = (
-    f"This agent currently has access to documents from '{os.path.basename(pdf_path)}'. "
-    "Topics included: Electric charges and their properties, conductors and insulators, "
-    "charging by induction, Coulomb's Law, the principle of superposition for forces between multiple charges, "
-    "electric field, electric field lines, electric dipole, electric field due to a point charge, "
-    "electric field due to an electric dipole (on axial and equatorial lines), "
-    "torque on an electric dipole in a uniform electric field, "
-    "continuous charge distribution (linear, surface, and volume charge density), "
-    "Gauss's Law and its applications (electric field due to an infinitely long straight uniformly charged wire, "
-    "uniformly charged infinite plane sheet, and uniformly charged thin spherical shell)."
-    )
+    pdf_filename = os.path.basename(pdf_path)
+    summary = PDF_SUMMARIES.get(pdf_filename, "No specific summary available for this document.")
+    updated_indexed_document_summary = f"Documents now include content from {pdf_filename}. {summary}"
 
     return {"final_answer": f"Successfully ingested {os.path.basename(pdf_path)} and updated indices.",
             "indexed_document_summary": updated_indexed_document_summary}
@@ -708,6 +839,7 @@ def run_agent():
         return
 
     print("Available PDFs for ingestion:")
+    available_pdfs = sorted(available_pdfs)
     for i, pdf_name in enumerate(available_pdfs):
         print(f"{i+1}. {pdf_name}")
 
@@ -716,7 +848,7 @@ def run_agent():
         try:
             choice = input("Enter the number of the PDF to use (or 'exit' to quit): ")
             if choice.lower() == 'exit' or choice.lower() == 'quit':
-                return
+                sys.exit("Exiting program.")  # Use sys.exit() to terminate the script
             choice_idx = int(choice) - 1
             if 0 <= choice_idx < len(available_pdfs):
                 selected_pdf_name = available_pdfs[choice_idx]
@@ -739,6 +871,7 @@ def run_agent():
     hybrid_retriever.load_pdf_for_retrieval(pdf_name_without_ext)
 
     # Initialize RetrievalCache (v4) for the selected PDF
+    global retrieval_cache
     paths = pdf_manager.get_pdf_output_dirs(pdf_name_without_ext)
     retrieval_cache = RetrievalCache(cache_dir=paths["retrieval_cache_dir"], embedding_model=embedding_model)
 
@@ -749,29 +882,9 @@ def run_agent():
     profile_manager = ProfileManager(db_path=PROFILE_DB_PATH)
 
     # Initial indexed document summary (can be updated by ingest_pdf_node)
-    # initial_indexed_doc_summary = f"This agent currently has access to documents from '{selected_pdf_name}'. Topics include [add general topics here]." # Placeholder
-    # initial_indexed_doc_summary = (
-    # f"This agent currently has access to documents from '{selected_pdf_name}'. "
-    # "Topics included: The Toyota Way philosophy, operational excellence, "
-    # "the Toyota Production System (TPS), and scientific thinking as applied to problem-solving and continuous "
-    # "improvement within an organization."
-    # "annual net income/loss of major automakers (Toyota, Ford, Volkswagen, General Motors, Honda) from 2004-2018, "
-    # "vehicle quality and long-term reliability ratings (J.D. Power, Dashboard Light) for various car brands "
-    # "(Toyota, Lexus, Scion, Porsche, Mercedes-Benz, Infiniti, Honda, Saab, Chevrolet, GMC, Jeep, Pontiac, Buick, "
-    # "Mitsubishi, Cadillac, Acura, Mercury, Hyundai, Lincoln, BMW, Dodge, Audi, Land Rover, Subaru, Volvo, Saturn, "
-    # "Jaguar, Nissan, Mazda, Ford, Kia, Chrysler, Volkswagen), "
-    # )
-    initial_indexed_doc_summary = (
-    f"This agent currently has access to documents from '{selected_pdf_name}'. "
-    "Topics included: Electric charges and their properties, conductors and insulators, "
-    "charging by induction, Coulomb's Law, the principle of superposition for forces between multiple charges, "
-    "electric field, electric field lines, electric dipole, electric field due to a point charge, "
-    "electric field due to an electric dipole (on axial and equatorial lines), "
-    "torque on an electric dipole in a uniform electric field, "
-    "continuous charge distribution (linear, surface, and volume charge density), "
-    "Gauss's Law and its applications (electric field due to an infinitely long straight uniformly charged wire, "
-    "uniformly charged infinite plane sheet, and uniformly charged thin spherical shell)."
-    )
+    summary = PDF_SUMMARIES.get(selected_pdf_name, "No specific summary available for this document.")
+    initial_indexed_doc_summary = f"This agent currently has access to documents from '{selected_pdf_name}'. {summary}"
+
     # --- Define the Graph ---
     with SqliteSaver.from_conn_string(CHECKPOINT_DB_PATH) as memory:
         workflow = StateGraph(AgentState)
@@ -859,7 +972,7 @@ def run_agent():
         while True:
             query = input("Your query (respond with exit or quit to quit): ")
             if query.lower() in ["exit", "quit"]:
-                break
+                sys.exit("Exiting program.")  # Use sys.exit() to terminate the script
             
             # The initial state for the graph run
             inputs = {"initial_query": query, "original_query": query, "indexed_document_summary": initial_indexed_doc_summary}
