@@ -11,6 +11,7 @@ langgraph_checkpoints/
 
 # Databases used in the program
 user_profiles.db
+test_cache.db
 
 # API related
 .langgraph_api/
