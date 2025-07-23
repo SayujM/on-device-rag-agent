@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import List, Dict
 
 # Local module imports
-from vector_db import get_chroma_client, COLLECTION_NAME
+from vector_db import get_chroma_client
 from embedding_model import load_embedding_model
 from text_utils import tokenize_text # Import from the new utility file
 
@@ -133,46 +133,51 @@ class HybridRetriever:
 
     def retrieve(self, query_texts: list[str], n_dense: int = 10, n_sparse: int = 10, rrf_k: int = 60) -> list[tuple[str, float]]:
         """
-        Performs hybrid search over a list of queries and fuses the results
-        from the active ChromaDB collection and BM25 index.
+        Performs hybrid search over a list of queries. It re-ranks results based on
+        the consensus (occurrence count) between query variations, using a reciprocal
+        rank score as a tie-breaker.
 
         Args:
             query_texts (list[str]): A list of queries (original + transformed).
             n_dense (int): Number of results to fetch per query for dense search.
             n_sparse (int): Number of results to fetch per query for sparse search.
-            rrf_k (int): Constant used in the RRF calculation.
+            rrf_k (int): (Unused in this implementation) Constant for RRF calculation.
 
         Returns:
-            list[tuple[str, float]]: A sorted list of (chunk_id, score) tuples.
+            list[tuple[str, tuple[int, float]]]: A sorted list of
+            (chunk_id, (count, score)) tuples.
         """
         if self.active_chroma_collection is None or self.active_bm25_index is None:
             raise RuntimeError("Retrieval components not active. Please load a PDF first.")
 
-        all_dense_results = []
-        all_sparse_results = []
+        all_results = defaultdict(int)
+        chunk_scores = defaultdict(float)
 
         print(f"\nPerforming dense and sparse search for {len(query_texts)} queries...")
         for query in query_texts:
-            all_dense_results.append(self.dense_search(query, n_results=n_dense))
-            all_sparse_results.append(self.sparse_search(query, n_results=n_sparse))
-        
-        # --- Reciprocal Rank Fusion (RRF) ---
-        fused_scores = defaultdict(float)
-        
-        # Process dense results
-        for result_list in all_dense_results:
-            for i, doc_id in enumerate(result_list):
-                fused_scores[doc_id] += 1 / (rrf_k + i + 1) # i is 0-indexed rank
+            dense_results = self.dense_search(query, n_results=n_dense)
+            sparse_results = self.sparse_search(query, n_results=n_sparse)
 
-        # Process sparse results
-        for result_list in all_sparse_results:
-            for i, doc_id in enumerate(result_list):
-                fused_scores[doc_id] += 1 / (rrf_k + i + 1)
+            # Combine and count occurrences
+            for chunk_id in dense_results + sparse_results:
+                all_results[chunk_id] += 1
 
-        # Sort documents by their fused scores in descending order
-        reranked_results = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
-        
-        print("Search complete. Results fused and re-ranked.")
+            # Score based on rank (Reciprocal Rank)
+            for i, chunk_id in enumerate(dense_results):
+                chunk_scores[chunk_id] += 1 / (i + 1)
+            for i, chunk_id in enumerate(sparse_results):
+                chunk_scores[chunk_id] += 1 / (i + 1)
+
+        # Combine scores and counts for final ranking
+        combined_scores = {}
+        for chunk_id, count in all_results.items():
+            # Prioritize documents found by multiple queries, then by rank score
+            combined_scores[chunk_id] = (count, chunk_scores[chunk_id])
+
+        # Sort by count (desc), then by score (desc)
+        reranked_results = sorted(combined_scores.items(), key=lambda item: (item[1][0], item[1][1]), reverse=True)
+
+        print("Search complete. Results fused and re-ranked based on consensus.")
         return reranked_results
 
     def get_active_content_map(self) -> Dict[str, str]:

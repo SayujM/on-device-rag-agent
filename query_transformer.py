@@ -44,14 +44,14 @@ class QueryTransformer:
                        Returns an empty list if generation fails.
         """
         # Using the official Gemma instruction-following format
-        prompt = f"<start_of_turn>user\nGenerate {num_variations} diverse and semantically distinct search queries based on this question: '{user_query}' Each query should be on a new line, without numbers or bullets.<end_of_turn>\n<start_of_turn>model\n"
+        prompt = f"<start_of_turn>user\nGenerate {num_variations} paraphrased versions of the following question. The new queries should be very similar in meaning to the original. Each query must be on a new line and should not have numbers or bullets: '{user_query}'<end_of_turn>\n<start_of_turn>model\n"
 
         print(f"\nTransforming query: '{user_query}'")
         try:
             response = self.llm(
                 prompt=prompt,
                 max_tokens=200,  # Allow ample space for the queries
-                temperature=0.8, # Higher temperature for more creative/varied outputs
+                temperature=0.4, # Lower temperature for more focused, less creative outputs
                 stop=["<end_of_turn>"], # Stop token for Gemma
             )
             
@@ -71,7 +71,7 @@ class QueryTransformer:
         except Exception as e:
             print(f"Error during query transformation: {e}")
             return []
-
+""" Commenting out individual program testing code
 if __name__ == "__main__":
     # --- Configuration for Standalone Test ---
     GGUF_MODEL_PATH = os.path.join(os.path.dirname(__file__), "gemma-3n-E4B-it-Q4_K_M.gguf")
@@ -104,3 +104,4 @@ if __name__ == "__main__":
         print("Please ensure the GGUF model file 'gemma-3n-E4B-it-Q4_K_M.gguf' is in the project root directory.")
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}")
+"""
