@@ -505,12 +505,17 @@ class RAGInterface:
         
         print(f"New conversation started with Thread ID: {self.thread_id}")
         
+        summary_raw = PDF_SUMMARIES.get(pdf_filename, "No topic summary available for this PDF.")
+        summary_clean = summary_raw.replace("Topics included: ", "")
+        formatted_summary = f"**Topics in this document:** {summary_clean}"
+
         return (
             gr.update(visible=False),
             gr.update(visible=True),
-            gr.update(value="", visible=False), # Hide loading message
+            gr.update(visible=False), # Hide loading message
             f"Chatting with {pdf_filename}",
             [],
+            gr.update(value=formatted_summary)
         )
     
     def end_session(self):
@@ -528,7 +533,8 @@ class RAGInterface:
             gr.update(visible=False), # Hide the chat_screen
             gr.update(visible=True) ,   # Show the setup_screen
             gr.Dropdown(choices=self.available_pdfs, value=None, info="Please select a PDF from the dropdown."), # Reset PDF dropdown
-            gr.update(visible=False) # Ensure loading message is hidden when returning to setup
+            gr.update(visible=False), # Ensure loading message is hidden when returning to setup
+            gr.update(value="")       # Clear the topic summary
         )
 
     def chat(self, message: str, history: List[List[str]]) -> Tuple[str, List[List[str]]]:
@@ -611,6 +617,7 @@ class RAGInterface:
 
             with gr.Column(visible=False) as chat_screen:
                 chat_title = gr.Markdown("## Chat")
+                topic_summary = gr.Markdown(label="Topic Summary")
                 chatbot = gr.Chatbot([], elem_id="chatbot", bubble_full_width=False, height=500)
                 with gr.Row():
                     txt = gr.Textbox(scale=4, show_label=False, placeholder="Type-in your query here (press ENTER key to submit)...", container=False)
@@ -625,13 +632,13 @@ class RAGInterface:
             ).then(
                 self.start_session,
                 inputs=[pdf_dropdown, user_id_input],
-                outputs=[setup_screen, chat_screen, loading_message, chat_title, chatbot]
+                outputs=[setup_screen, chat_screen, loading_message, chat_title, chatbot, topic_summary]
             )
 
             end_button.click(
                 self.end_session,
                 inputs=None,
-                outputs=[chatbot, chat_screen, setup_screen, pdf_dropdown, loading_message]
+                outputs=[chatbot, chat_screen, setup_screen, pdf_dropdown, loading_message, topic_summary]
             )
         print("Launching Gradio Interface...")
         demo.launch()
