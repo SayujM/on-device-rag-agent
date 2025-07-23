@@ -11,6 +11,7 @@ from embedding_model import load_embedding_model # For chunking and embedding
 from text_utils import tokenize_text # For chunking
 from text_chunker import chunk_text # New import for robust chunking
 
+""" Commenting out individual program testing code
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PDF_SOURCE_DIR = os.path.join(BASE_DIR, "pdf_files", "source")
@@ -23,6 +24,10 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 # and then passed to pdf_manager for use here.
 _hybrid_retriever_instance: HybridRetriever = None
 _embedding_model_instance = None
+"""
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PDF_SOURCE_DIR = os.path.join(BASE_DIR, "pdf_files", "source")
+PDF_DESTINATION_BASE_DIR = os.path.join(BASE_DIR, "pdf_files", "destination")
 
 def set_global_retriever_and_embedding_model(retriever: HybridRetriever, embedding_model):
     global _hybrid_retriever_instance
@@ -63,7 +68,15 @@ def process_and_index_pdf(pdf_path: str) -> Tuple[bool, str]:
     paths = get_pdf_output_dirs(pdf_name_without_ext)
 
     if check_pdf_processed(pdf_name_without_ext):
-        print(f"PDF '{pdf_name_without_ext}' already processed. Skipping.")
+        print(f"PDF '{pdf_name_without_ext}' already processed. Verifying ChromaDB...")
+        # --- BUG FIX: Use get_or_create_collection to handle missing DB ---
+        collection = _hybrid_retriever_instance.chroma_client.get_or_create_collection(name=pdf_name_without_ext)
+        if collection.count() == 0:
+            print(f"Warning: ChromaDB collection '{pdf_name_without_ext}' was missing or empty. Re-ingesting from JSON.")
+            with open(paths["text_chunks_json_path"], "r", encoding="utf-8") as f:
+                chunks_to_reingest = json.load(f)
+            _hybrid_retriever_instance.add_documents_to_chroma(chunks_to_reingest, collection_name=pdf_name_without_ext)
+        # --- END BUG FIX ---
         return True, f"PDF '{pdf_name_without_ext}' already processed."
 
     print(f"Processing and indexing PDF: {pdf_path}...")

@@ -26,7 +26,7 @@ class RetrievalCache:
             collection_name (str): Name for the ChromaDB collection for cached queries.
             similarity_threshold (float): Cosine similarity threshold for cache hits.
         """
-        print(f"Initializing RetrievalCache (v4 - Corrected) at: {cache_dir}")
+        print(f"Initializing RetrievalCache (v4) at: {cache_dir}")
         self.cache_dir = cache_dir
         self.embedding_model = embedding_model
         self.similarity_threshold = similarity_threshold

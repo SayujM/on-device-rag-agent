@@ -4,7 +4,7 @@ import json
 
 # --- Configuration ---
 # Define a default model name, used when running this script directly.
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+# EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 # --- Embedding Model Loading ---
 def load_embedding_model(model_name: str):
@@ -51,6 +51,7 @@ def generate_embeddings(model: SentenceTransformer, texts: list[str]) -> list[li
         print(f"Error generating embeddings: {e}")
         return []
 
+""" Commenting out individual program testing code
 if __name__ == "__main__":
     # When run directly, use the default model name defined at the top.
     embedding_model = load_embedding_model(EMBEDDING_MODEL_NAME)
@@ -125,3 +126,4 @@ if __name__ == "__main__":
             print("No embeddings generated.")
     else:
         print("Embedding model could not be loaded. Cannot generate embeddings.")
+"""

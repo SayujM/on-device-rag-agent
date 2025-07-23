@@ -64,6 +64,8 @@ def chunk_text(pages_text: list[str], source_file: str, chunk_size: int = 500, c
 
     return chunks
 
+"""Commenting out individual program testing code
+
 if __name__ == "__main__":
     # Example Usage:
     # This section reads the extracted text from the specified file (output of pdf_processor.py)
@@ -139,3 +141,4 @@ if __name__ == "__main__":
         print(f"Average chunk length: {avg_length:.2f}")
     else:
         print("No chunks generated.")
+"""

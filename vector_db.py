@@ -2,9 +2,11 @@ import chromadb
 import os
 import json
 
+""" Commenting out individual program testing code
 # --- Configuration ---
 CHROMA_DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 COLLECTION_NAME = "rag_chunks"
+"""
 
 # --- ChromaDB Initialization ---
 def get_chroma_client(db_dir: str):
@@ -127,6 +129,8 @@ def query_vector_db(client: chromadb.PersistentClient, collection_name: str, que
     )
     return results
 
+"""Commenting out individual program testing code
+
 if __name__ == "__main__":
     # Example Usage:
     # 1. Get ChromaDB client
@@ -169,3 +173,4 @@ if __name__ == "__main__":
             print("No results found.")
     else:
         print("Could not load embedding model for querying.")
+"""
