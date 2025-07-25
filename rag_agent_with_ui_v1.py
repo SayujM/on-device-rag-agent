@@ -644,6 +644,11 @@ class RAGInterface:
         demo.launch()
 
 if __name__ == "__main__":
-    with SqliteSaver.from_conn_string(CHECKPOINT_DB_PATH) as memory:
-        ui = RAGInterface(memory=memory)
-        ui.launch()
+    try:
+        with SqliteSaver.from_conn_string(CHECKPOINT_DB_PATH) as memory:
+            ui = RAGInterface(memory=memory)
+            ui.launch()
+    except KeyboardInterrupt:
+        print("\nProgram interrupted by user. Exiting gracefully.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
