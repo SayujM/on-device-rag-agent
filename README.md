@@ -40,14 +40,24 @@ The project is structured into several key Python modules, each responsible for 
     uv pip install -r requirements.txt
     ```
 
-2.  **Place your PDF files** in the `pdf_files/source` directory.
+2.  **Set up Google API Keys (Optional, for Web Search):**
+    If you wish to enable web search functionality, you need to provide your Google Custom Search API Key and Search Engine ID.
+    Create a `.env` file in the project root (or copy `.env.example` and rename it to `.env`) and populate it with your keys:
 
-3.  **Run the Gradio UI:**
+    ```
+    GOOGLE_API_KEY="your_google_api_key_here"
+    SEARCH_ENGINE_ID="your_search_engine_id_here"
+    ```
+    You can obtain these keys by following the instructions [here](https://developers.google.com/custom-search/v1/overview).
+
+3.  **Place your PDF files** in the `pdf_files/source` directory.
+
+4.  **Run the Gradio UI:**
 
     ```bash
     python rag_agent_with_ui_v1.py
     ```
 
-4.  **Open your web browser** and navigate to the URL provided by Gradio (usually `http://127.0.0.1:7860`).
+5.  **Open your web browser** and navigate to the URL provided by Gradio (usually `http://127.0.0.1:7860`).
 
-5.  **Select a PDF**, enter a user ID, and start chatting with your document!
+6.  **Select a PDF**, enter a user ID, and start chatting with your document!
