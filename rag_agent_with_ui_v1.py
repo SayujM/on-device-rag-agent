@@ -309,8 +309,8 @@ class RAGAgent:
         retrieved_docs = [chunk for chunk in self.hybrid_retriever.active_all_chunks if chunk["metadata"]["chunk_id"] in retrieved_ids]
         
         # --- OBSERVABILITY: Sort the retrieved_docs based on the reranked order ---
-        id_to_rank = {chunk_id: i for i, (chunk_id, _) in enumerate(retrieved_results)}
-        retrieved_docs.sort(key=lambda doc: id_to_rank.get(doc['metadata']['chunk_id'], float('inf')))
+        order_map = {chunk_id: i for i, chunk_id in enumerate(retrieved_ids)}
+        retrieved_docs.sort(key=lambda doc: order_map.get(doc['metadata']['chunk_id'], float('inf')))
         print(f"Retrieved {len(retrieved_docs)} documents.")
 
         # --- OBSERVABILITY: Print top 5 chunks ---
