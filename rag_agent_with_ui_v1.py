@@ -618,7 +618,7 @@ class RAGInterface:
             with gr.Column(visible=False) as chat_screen:
                 chat_title = gr.Markdown("## Chat")
                 topic_summary = gr.Markdown(label="Topic Summary")
-                chatbot = gr.Chatbot([], elem_id="chatbot", bubble_full_width=False, height=500)
+                chatbot = gr.Chatbot([], elem_id="chatbot", type="messages", height=500)
                 with gr.Row():
                     txt = gr.Textbox(scale=4, show_label=False, placeholder="Type-in your query here (press ENTER key to submit)...", container=False)
                 txt.submit(self.chat, [txt, chatbot], [txt, chatbot])
@@ -641,7 +641,7 @@ class RAGInterface:
                 outputs=[chatbot, chat_screen, setup_screen, pdf_dropdown, loading_message, topic_summary]
             )
         print("Launching Gradio Interface...")
-        demo.launch()
+        demo.launch(share=True)
 
 if __name__ == "__main__":
     try:
