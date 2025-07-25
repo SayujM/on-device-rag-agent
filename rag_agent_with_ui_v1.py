@@ -537,17 +537,19 @@ class RAGInterface:
             gr.update(value="")       # Clear the topic summary
         )
 
-    def chat(self, message: str, history: List[List[str]]) -> Tuple[str, List[List[str]]]:
+    def chat(self, message: str, history: List[dict[str, str]]) -> Tuple[str, List[dict[str, str]]]:
         if self.agent is None:
             raise gr.Error("Agent not initialized. Please start a session first.")
             
         print(f"User '{self.user_id}' | Thread '{self.thread_id}' | Query: '{message}'")
         
-        history.append([message, None])
+        # Append user message to history in Gradio's expected dictionary format
+        history.append({"role": "user", "content": message})
         yield "", history # <--- First yield: Clears textbox, shows user message in chatbot
 
         # Add a "thinking" message from the assistant immediately
-        history[-1][1] = "Thinking... &#129504;" # Assign a temporary "Thinking..." message
+        thinking_message_dict = {"role": "assistant", "content": "Thinking... &#129504;"}
+        history.append(thinking_message_dict)
         yield "", history # <--- Second yield: Updates chatbot to show "Thinking..." below user's message
 
         # Now, perform the actual RAG agent invocation (the long-running part)
@@ -555,7 +557,15 @@ class RAGInterface:
         response = final_state.get('final_answer', "Sorry, something went wrong.")
         
         print(f"Agent Response: {response}")
-        history[-1][1] = response
+
+        # Replace the "thinking" message with the actual response
+        # Check if the last message is indeed our thinking message (by content, as objects might differ)
+        if history and history[-1].get("content") == thinking_message_dict["content"]:
+            history[-1]["content"] = response # Update content of the last message
+        else:
+            # Fallback: if for some reason the thinking message isn't last, append the response
+            history.append({"role": "assistant", "content": response})
+
         yield "", history # <--- Third yield: Updates chatbot with the final response
 
     def launch(self):
