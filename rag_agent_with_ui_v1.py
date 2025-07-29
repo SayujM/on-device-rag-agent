@@ -669,13 +669,27 @@ class RAGInterface:
 
             with gr.Column(visible=False) as chat_screen:
                 chat_title = gr.Markdown("## Chat")
+                
                 topic_summary = gr.Markdown(label="Topic Summary")
-                with gr.Accordion("Click here to check-out your RAG-Agent architecture", open=False):
+                
+                gr.Markdown("---")
+
+                with gr.Accordion("🤖 Peek Inside the Agent's Brain: Click here to View Workflow", open=False):
                     architecture_view = gr.HTML(value="")
+                
+                # Add a horizontal line separator
+                gr.Markdown("---")
+
                 chatbot = gr.Chatbot([], elem_id="chatbot", type="messages", height=500)
+                
                 with gr.Row():
                     txt = gr.Textbox(scale=4, show_label=False, placeholder="Type-in your query here (press ENTER key to submit)...", container=False)
+                
                 txt.submit(self.chat, [txt, chatbot], [txt, chatbot])
+
+                # Add another separator before the final button
+                gr.Markdown("---")
+                
                 end_button = gr.Button("End Chat", variant="primary")
 
             start_button.click(
