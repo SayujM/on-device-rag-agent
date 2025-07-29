@@ -8,7 +8,7 @@ This project implements a sophisticated, on-device Retrieval-Augmented Generatio
 
 The project is structured into several key Python modules, each responsible for a specific part of the RAG pipeline:
 
--   **`rag_agent_with_ui_v1.py`**: The main entry point of the application. It orchestrates the entire RAG process, from user input to final response generation, and integrates with a Gradio UI for a seamless user experience.
+-   **`rag_agent_with_ui_v3.py`**: The main entry point of the application. It orchestrates the entire RAG process, from user input to final response generation, and integrates with a Gradio UI for a seamless user experience.
 
 -   **`query_transformer.py`**: Takes a user's query and transforms it into multiple, semantically similar queries. This query expansion technique helps to improve the recall of the retrieval system.
 
