@@ -41,7 +41,7 @@ PDF_SUMMARIES = {
     "The-toyota-way-second-edition-05_chapter_5.pdf": "Topics included: Building a culture of stopping to fix problems to get quality right the first time (Jidoka), Andon cords/lights as a system to signal abnormalities, the importance of immediate problem-solving at the source, root cause analysis, and integrating quality control into every step of the process rather than inspecting at the end.",
     "The-toyota-way-second-edition-06_chapter_6.pdf": "Topics included: Standardization as a foundation for continuous improvement and quality, the importance of stable processes, visual management, methods for creating and maintaining standards (e.g., standard work sheets), and how standardization supports problem-solving and training within the Toyota Production System.",
     "The-toyota-way-second-edition-07_chapter_7.pdf": "Topics included: Using pull systems to avoid overproduction, Just-in-Time (JIT) production, the concept of kanban as a pull signal, the dangers of push systems and overproduction, inventory reduction as a way to expose problems, and how pull systems link processes based on actual customer demand.",
-    "The-toyuta-way-second-edition-08_chapter_8.pdf": "Topics included: Building quality into the process (Jidoka principle), the concept of 'stop and fix' errors immediately, creating a culture where employees are empowered to halt production for quality issues, the importance of root cause analysis and permanent countermeasures, and examples of Toyota's commitment to quality at the source.",
+    "The-toyota-way-second-edition-08_chapter_8.pdf": "Topics included: Building quality into the process (Jidoka principle), the concept of 'stop and fix' errors immediately, creating a culture where employees are empowered to halt production for quality issues, the importance of root cause analysis and permanent countermeasures, and examples of Toyota's commitment to quality at the source.",
     "The-toyota-way-second-edition-09_chapter_9.pdf": "Topics included: Use of visual control to support people in decision-making and problem-solving, visual management principles, the importance of displaying information clearly and simply, examples of visual control systems (e.g., kanban, production boards), and how visual aids help identify abnormalities and facilitate immediate corrective action.",
     "The-toyota-way-second-edition-10_chapter_10.pdf": "Topics included: Developing stable and reliable suppliers as an extension of the enterprise, long-term partnerships with suppliers, supplier development and continuous improvement, mutual learning and trust, and integrating suppliers into the Toyota Production System.",
     "The-toyota-way-second-edition-11_chapter_11.pdf": "Topics included: Growing leaders from within who understand the work, live the philosophy, and teach it to others, the importance of developing people through daily work, creating a learning organization, and the role of humility and continuous self-improvement for leaders.",
@@ -523,7 +523,7 @@ class RAGInterface:
             </head>
             <body>
                 <div class="mermaid">
-{mermaid_markup}
+                    {mermaid_markup}
                 </div>
                 <script type="module">
                     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
