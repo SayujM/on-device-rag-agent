@@ -4,6 +4,8 @@ import json
 import uuid
 from typing import List, Tuple
 import re
+import html
+import base64
 import gradio as gr
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -505,6 +507,44 @@ class RAGInterface:
         
         print(f"New conversation started with Thread ID: {self.thread_id}")
         
+        # Generate Mermaid diagram
+        try:
+            mermaid_markup = self.agent.app.get_graph().draw_mermaid()
+
+            # Create a self-contained HTML document for the iframe.
+            iframe_html_doc = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ margin: 0; padding: 10px; box-sizing: border-box; background-color: white; }}
+                    .mermaid {{ text-align: center; }}
+                </style>
+            </head>
+            <body>
+                <div class="mermaid">
+{mermaid_markup}
+                </div>
+                <script type="module">
+                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                    await mermaid.run();
+                </script>
+            </body>
+            </html>
+            """
+
+            # Encode the HTML document to Base64
+            doc_bytes = iframe_html_doc.encode('utf-8')
+            b64_doc = base64.b64encode(doc_bytes).decode('utf-8')
+            data_uri = f"data:text/html;base64,{b64_doc}"
+
+            # Use a Data URI in the iframe src for maximum compatibility
+            mermaid_html = f'<iframe src="{data_uri}" style="width: 100%; height: 600px; border: none; border-radius: 8px;"></iframe>'
+
+        except Exception as e:
+            print(f"Could not generate Mermaid diagram: {e}")
+            mermaid_html = "<p>Could not render agent architecture diagram.</p>"
+
         summary_raw = PDF_SUMMARIES.get(pdf_filename, "No topic summary available for this PDF.")
         summary_clean = summary_raw.replace("Topics included: ", "")
         formatted_summary = f"**Topics in this document:** {summary_clean}"
@@ -515,7 +555,8 @@ class RAGInterface:
             gr.update(visible=False), # Hide loading message
             f"Chatting with {pdf_filename}",
             [],
-            gr.update(value=formatted_summary)
+            gr.update(value=formatted_summary),
+            gr.update(value=mermaid_html)
         )
     
     def end_session(self):
@@ -534,7 +575,8 @@ class RAGInterface:
             gr.update(visible=True) ,   # Show the setup_screen
             gr.Dropdown(choices=self.available_pdfs, value=None, info="Please select a PDF from the dropdown."), # Reset PDF dropdown
             gr.update(visible=False), # Ensure loading message is hidden when returning to setup
-            gr.update(value="")       # Clear the topic summary
+            gr.update(value=""),       # Clear the topic summary
+            gr.update(value="")       # Clear the architecture view
         )
 
     def chat(self, message: str, history: List[dict[str, str]]) -> Tuple[str, List[dict[str, str]]]:
@@ -628,6 +670,8 @@ class RAGInterface:
             with gr.Column(visible=False) as chat_screen:
                 chat_title = gr.Markdown("## Chat")
                 topic_summary = gr.Markdown(label="Topic Summary")
+                with gr.Accordion("Click here to check-out your RAG-Agent architecture", open=False):
+                    architecture_view = gr.HTML(value="")
                 chatbot = gr.Chatbot([], elem_id="chatbot", type="messages", height=500)
                 with gr.Row():
                     txt = gr.Textbox(scale=4, show_label=False, placeholder="Type-in your query here (press ENTER key to submit)...", container=False)
@@ -642,13 +686,13 @@ class RAGInterface:
             ).then(
                 self.start_session,
                 inputs=[pdf_dropdown, user_id_input],
-                outputs=[setup_screen, chat_screen, loading_message, chat_title, chatbot, topic_summary]
+                outputs=[setup_screen, chat_screen, loading_message, chat_title, chatbot, topic_summary, architecture_view]
             )
 
             end_button.click(
                 self.end_session,
                 inputs=None,
-                outputs=[chatbot, chat_screen, setup_screen, pdf_dropdown, loading_message, topic_summary]
+                outputs=[chatbot, chat_screen, setup_screen, pdf_dropdown, loading_message, topic_summary, architecture_view]
             )
         print("Launching Gradio Interface...")
         demo.launch(share=True)
