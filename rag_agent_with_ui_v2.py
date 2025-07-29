@@ -286,7 +286,8 @@ class RAGAgent:
         History: {state.summarized_history}
         User Profile: {json.dumps(state.personalization_context, indent=2)}
         User Message: {state.original_query}
-        Response:<end_of_turn><start_of_turn>model'''
+        Provide your response directly, without any leading labels or characters.
+        <end_of_turn><start_of_turn>model'''
         response = self.llm(prompt=prompt, max_tokens=200, stop=["<end_of_turn>"])
         return {"final_answer": response["choices"][0]["text"].strip()}
 
