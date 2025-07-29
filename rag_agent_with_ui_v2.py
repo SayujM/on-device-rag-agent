@@ -125,8 +125,7 @@ class RAGAgent:
         workflow = StateGraph(AgentState)
         # Node definitions
         workflow.add_node("load_user_profile", self.load_user_profile_node)
-        workflow.add_node("add_initial_query_to_history", self.add_initial_query_to_history_node)
-        workflow.add_node("summarize_history", self.summarize_history_node)
+        workflow.add_node("manage_chat_history", self.manage_chat_history_node)
         workflow.add_node("contextualize_query", self.contextualize_query_node)
         workflow.add_node("route_query", self.route_query_node)
         workflow.add_node("transform_query", self.transform_query_node)
@@ -142,9 +141,8 @@ class RAGAgent:
 
         workflow.set_entry_point("load_user_profile")
         # Edge definitions
-        workflow.add_edge("load_user_profile", "add_initial_query_to_history")
-        workflow.add_edge("add_initial_query_to_history", "summarize_history")
-        workflow.add_edge("summarize_history", "contextualize_query")
+        workflow.add_edge("load_user_profile", "manage_chat_history")
+        workflow.add_edge("manage_chat_history", "contextualize_query")
         workflow.add_edge("contextualize_query", "route_query")
         workflow.add_conditional_edges(
             "route_query", 
@@ -218,19 +216,18 @@ class RAGAgent:
                 "name": user_id, "preferences": {"tone": "formal"}, "past_interactions_summary": ""
             }}
 
-    def add_initial_query_to_history_node(self, state: AgentState) -> dict:
-        print("--- Node: Adding Initial Query to History ---")
+    def manage_chat_history_node(self, state: AgentState) -> dict:
+        print("--- Node: Managing Chat History ---")
+        # Add initial query to history
         updated_chat_history = state.chat_history + [HumanMessage(content=state.initial_query)]
-        return {"chat_history": updated_chat_history}
 
-    def summarize_history_node(self, state: AgentState) -> dict:
-        print("--- Node: Summarizing History ---")
-        if not state.chat_history: return {"summarized_history": ""}
-        if len(state.chat_history) <= 6:
-            summary = "\n".join([f"{msg.type}: {msg.content}" for msg in state.chat_history])
-            return {"summarized_history": summary}
-        recent = state.chat_history[-4:]
-        older = state.chat_history[:-4]
+        # Summarize history
+        if not updated_chat_history: return {"summarized_history": "", "chat_history": updated_chat_history}
+        if len(updated_chat_history) <= 6:
+            summary = "\n".join([f"{msg.type}: {msg.content}" for msg in updated_chat_history])
+            return {"summarized_history": summary, "chat_history": updated_chat_history}
+        recent = updated_chat_history[-4:]
+        older = updated_chat_history[:-4]
         summary_prompt = f'''<start_of_turn>user
         Briefly summarize the following conversation:
         { "\n".join([f'{msg.type}: {msg.content}' for msg in older]) }
@@ -238,7 +235,7 @@ class RAGAgent:
         summary_response = self.llm(prompt=summary_prompt, max_tokens=200, stop=["<end_of_turn>"])
         summary = summary_response["choices"][0]["text"].strip()
         formatted_recent = " ".join([f"{msg.type}: {msg.content}" for msg in recent])
-        return {"summarized_history": f"[Summary: {summary}] [Recent:] {formatted_recent}"}
+        return {"summarized_history": f"[Summary: {summary}] [Recent:] {formatted_recent}", "chat_history": updated_chat_history}
 
     def contextualize_query_node(self, state: AgentState) -> dict:
         print("--- Node: Contextualizing Query ---")
