@@ -8,6 +8,7 @@ pdf_files/
 chroma_db/
 retrieval_cache/
 langgraph_checkpoints/
+temp_images/
 
 # Databases used in the program
 user_profiles.db
