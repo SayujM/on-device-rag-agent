@@ -20,6 +20,7 @@ from hybrid_retriever_v4 import HybridRetriever
 from retrieval_cache_v4 import RetrievalCache
 from embedding_model import load_embedding_model
 from profile_manager import ProfileManager
+from web_searcher import hybrid_web_search
 import pdf_manager
 import config
 
@@ -112,11 +113,9 @@ class RAGAgent:
 
     def _build_graph(self):
         workflow = StateGraph(AgentState)
-        # Node definitions
+        # Streamlined Node Definitions
         workflow.add_node("load_user_profile", self.load_user_profile_node)
         workflow.add_node("manage_chat_history", self.manage_chat_history_node)
-        workflow.add_node("extract_and_update_preferences", self.extract_and_update_preferences_node)
-        workflow.add_node("contextualize_query", self.contextualize_query_node)
         workflow.add_node("route_query", self.route_query_node)
         workflow.add_node("transform_query", self.transform_query_node)
         workflow.add_node("retrieve_documents", self.retrieve_documents_node)
@@ -129,12 +128,10 @@ class RAGAgent:
         workflow.add_node("update_history_and_profile", self.update_history_and_profile_node)
         workflow.add_node("cleanup_state", self.cleanup_state_node)
 
+        # Streamlined Entry & Routing Edges
         workflow.set_entry_point("load_user_profile")
-        # Edge definitions
         workflow.add_edge("load_user_profile", "manage_chat_history")
-        workflow.add_edge("manage_chat_history", "extract_and_update_preferences")
-        workflow.add_edge("extract_and_update_preferences", "contextualize_query")
-        workflow.add_edge("contextualize_query", "route_query")
+        workflow.add_edge("manage_chat_history", "route_query")
         workflow.add_conditional_edges(
             "route_query", 
             lambda state: state.query_route,
@@ -195,146 +192,159 @@ class RAGAgent:
         if not user_id:
             print("Warning: No user_id found. Using default profile.")
             return {"personalization_context": {
-                "name": "Default User", "preferences": {"tone": "formal"}, "past_interactions_summary": ""
+                "name": "User", "preferences": {"tone": "formal", "format": "bullet points"}, "past_interactions_summary": ""
             }}
         profile = self.profile_manager.get_profile(user_id)
         if profile:
-            print(f"Loaded profile for user: {user_id}")
-            print(f"--- Profile Loaded: Name='{profile.get('name')}', Preferences={profile.get('preferences')}, Summary='{profile.get('past_interactions_summary')}' ---")
+            # Force user identity to match the authenticated session user_id
+            profile["name"] = user_id
+            print(f"Loaded profile for user: '{user_id}' (Preferences: {profile.get('preferences')})")
             return {"personalization_context": profile}
         else:
-            print(f"No profile for new user: {user_id}. Creating default.")
             default_profile = {
-                "name": user_id, "preferences": {"tone": "formal"}, "past_interactions_summary": ""
+                "name": user_id, "preferences": {"tone": "formal", "format": "bullet points"}, "past_interactions_summary": ""
             }
-            print(f"--- Default Profile Created: Name='{default_profile.get('name')}', Preferences={default_profile.get('preferences')}, Summary='{default_profile.get('past_interactions_summary')}' ---")
+            print(f"Created default profile for new user: '{user_id}'")
             return {"personalization_context": default_profile}
 
     def manage_chat_history_node(self, state: AgentState) -> dict:
         print("--- Node: Managing Chat History ---")
-        # Add initial query to history
         updated_chat_history = state.chat_history + [HumanMessage(content=state.initial_query)]
 
-        # Summarize history
-        if not updated_chat_history: return {"summarized_history": "", "chat_history": updated_chat_history}
-        if len(updated_chat_history) <= 6:
+        if not updated_chat_history:
+            return {"summarized_history": "", "chat_history": updated_chat_history}
+
+        # With Gemma 3's high context, keep up to 16 messages (8 turns) raw without lossy micro-summarization
+        if len(updated_chat_history) <= 16:
             summary = "\n".join([f"{msg.type}: {msg.content}" for msg in updated_chat_history])
             return {"summarized_history": summary, "chat_history": updated_chat_history}
-        recent = updated_chat_history[-4:]
-        older = updated_chat_history[:-4]
+
+        # For long conversations, summarize older exchanges and preserve the recent 6 turns
+        recent = updated_chat_history[-6:]
+        older = updated_chat_history[:-6]
         summary_prompt = f'''<start_of_turn>user
-        Briefly summarize the following conversation:
+        Briefly summarize the key facts from this earlier conversation:
         { "\n".join([f'{msg.type}: {msg.content}' for msg in older]) }
         SUMMARY:<end_of_turn><start_of_turn>model'''
         summary_response = self.llm(prompt=summary_prompt, max_tokens=200, stop=["<end_of_turn>"])
         summary = summary_response["choices"][0]["text"].strip()
-        formatted_recent = " ".join([f"{msg.type}: {msg.content}" for msg in recent])
-        return {"summarized_history": f"[Summary: {summary}] [Recent:] {formatted_recent}", "chat_history": updated_chat_history}
-
-    def extract_and_update_preferences_node(self, state: AgentState) -> dict:
-        print("--- Node: Extracting and Updating Preferences ---")
-        preference_update_prompt = f'''<start_of_turn>user
-        Analyze the following user message and current user profile. If the user is expressing a preference change (e.g., tone, formatting), or stating their name, extract the new preferences as a JSON object. If no preference change is requested, return an empty JSON object {{}}.
-
-        User Message: {state.original_query}
-        Current Profile: {json.dumps(state.personalization_context, indent=2)}
-
-        Example of desired output for "change my tone to casual":
-        {{"preferences": {{"tone": "casual"}}}}
-
-        Example of desired output for "use bullet points":
-        {{"preferences": {{"formatting": "bullet_points"}}}}
-
-        Example of desired output for "my name is John Doe":
-        {{"name": "John Doe"}}
-
-        JSON Preferences:<end_of_turn>
-        <start_of_turn>model
-        '''
-        preference_response = self.llm(prompt=preference_update_prompt, max_tokens=200, stop=["<end_of_turn>"])
-        preference_json_str = preference_response["choices"][0]["text"].strip()
-
-        # Extract JSON from markdown code block if present
-        json_match = re.search(r'```json\n(.*?)```', preference_json_str, re.DOTALL)
-        if json_match:
-            clean_json_str = json_match.group(1).strip()
-        else:
-            clean_json_str = preference_json_str # Assume it's pure JSON if no markdown wrapper
-
-        # Directly modify state.personalization_context
-        try:
-            extracted_preferences = json.loads(clean_json_str) # Use the cleaned string
-            if extracted_preferences:
-                if "name" in extracted_preferences:
-                    state.personalization_context["name"] = extracted_preferences["name"]
-                if "preferences" in extracted_preferences and isinstance(extracted_preferences["preferences"], dict):
-                    state.personalization_context["preferences"].update(extracted_preferences["preferences"])
-                print(f"Updated personalization context: {state.personalization_context}")
-        except json.JSONDecodeError:
-            print(f"Could not parse preference JSON: {clean_json_str}") # Print cleaned string for debug
-            # Continue with existing personalization_context
-
-        return {"personalization_context": state.personalization_context}
-
-    def contextualize_query_node(self, state: AgentState) -> dict:
-        print("--- Node: Contextualizing Query ---")
-        contextualize_prompt = f'''<start_of_turn>user
-        Given the chat history and user profile, generate a standalone search query from the user's latest question.
-        History: {state.summarized_history}
-        Profile: {json.dumps(state.personalization_context, indent=2)}
-        Question: {state.original_query}
-        Standalone Query:<end_of_turn><start_of_turn>model'''
-        ctx_query_response = self.llm(prompt=contextualize_prompt, max_tokens=100, stop=["<end_of_turn>"])
-        contextualized_query = ctx_query_response["choices"][0]["text"].strip()
-        print(f"Contextualized Query: {contextualized_query}")
-        return {"original_query": contextualized_query}
+        formatted_recent = "\n".join([f"{msg.type}: {msg.content}" for msg in recent])
+        return {"summarized_history": f"[Prior Context Summary: {summary}]\n{formatted_recent}", "chat_history": updated_chat_history}
 
     def route_query_node(self, state: AgentState) -> dict:
-        print("--- Node: Routing Query ---")
-        if state.initial_query.lower().startswith("/ingest "):
-            pdf_path = state.initial_query[len("/ingest "):].strip()
+        print("--- Node: Routing Query (Single-Pass Semantic Router) ---")
+        query_raw = state.initial_query.strip()
+
+        # 1. Direct System Command Routing
+        if query_raw.lower().startswith("/ingest "):
+            pdf_path = query_raw[len("/ingest "):].strip()
             return {"query_route": "ingest_pdf", "original_query": pdf_path} if os.path.exists(pdf_path) else \
                    {"query_route": "conversational_query", "final_answer": f"Error: PDF not found at {pdf_path}"}
 
-        relevance_prompt = f'''<start_of_turn>user
-        Is the user's question likely answerable by the document summary?
-        Respond with 'yes', 'no', or 'maybe'.
-        Summary: {state.indexed_document_summary}
-        Question: {state.original_query}
-        Answer:<end_of_turn><start_of_turn>model'''
-        relevance_response = self.llm(prompt=relevance_prompt, max_tokens=10, stop=["<end_of_turn>"])
-        relevance_grade = relevance_response["choices"][0]["text"].strip().lower()
-        print(f"Doc Relevance: '{relevance_grade}'")
-        if "yes" in relevance_grade or "maybe" in relevance_grade:
-            return {"query_route": "rag_query"}
+        # 2. Single-Pass 3-Way Semantic Intent Classification
+        routing_prompt = f'''<start_of_turn>user
+[YOUR TASK]
+You are an expert query router. Classify the user's message into EXACTLY ONE of three categories:
 
-        conversational_check_prompt = f'''<start_of_turn>user
-        Is the following a simple conversational question or does it need a web search?
-        Respond 'conversational' or 'needs_web_search'.
-        Question: {state.initial_query}
-        Answer:<end_of_turn><start_of_turn>model'''
-        conv_check_response = self.llm(prompt=conversational_check_prompt, max_tokens=20, stop=["<end_of_turn>"])
-        conv_type = conv_check_response["choices"][0]["text"].strip().lower()
-        print(f"Conversational Type: '{conv_type}'")
-        return {"query_route": "conversational_query"} if "conversational" in conv_type else {"query_route": "web_search_query"}
+1. CHITCHAT: Any greeting in any language (e.g., "Hi", "Hello", "Hola", "Namaste", "Bonjour"), social pleasantry, farewell, expression of thanks ("Thank you"), or question about who you are.
+2. DOCUMENT_QA: Any question or topic that directly relates to the loaded document's content and themes.
+3. WEB_SEARCH: Any question asking for external facts, news, people, entities, or topics not covered by the document.
+
+[LOADED DOCUMENT TOPICS]
+{state.indexed_document_summary}
+
+[USER MESSAGE]
+"{query_raw}"
+
+[INSTRUCTION]
+Respond with ONLY ONE word: CHITCHAT, DOCUMENT_QA, or WEB_SEARCH.
+
+Category:<end_of_turn>
+<start_of_turn>model
+'''
+        try:
+            response = self.llm(prompt=routing_prompt, max_tokens=15, temperature=0.0, stop=["<end_of_turn>"])
+            decision = response["choices"][0]["text"].strip().upper()
+            print(f"Router Semantic Decision: '{decision}'")
+        except Exception as e:
+            print(f"Router error: {e}. Defaulting to DOCUMENT_QA.")
+            decision = "DOCUMENT_QA"
+
+        if "CHITCHAT" in decision:
+            return {"query_route": "conversational_query"}
+        elif "WEB_SEARCH" in decision:
+            return {"query_route": "web_search_query"}
+        else:
+            return {"query_route": "rag_query"}
 
     def generate_simple_response_node(self, state: AgentState) -> dict:
         print("--- Node: Generating Simple Conversational Response ---")
+        user_name = state.personalization_context.get("name", "there")
+        user_msg = state.initial_query.strip()
+
         prompt = f'''<start_of_turn>user
-        Use the chat history and the user's profile to provide a friendly response.
-        History: {state.summarized_history}
-        User Profile: {json.dumps(state.personalization_context, indent=2)}
-        User Message: {state.original_query}
-        Provide your response directly, without any leading labels or characters.
-        <end_of_turn><start_of_turn>model'''
-        response = self.llm(prompt=prompt, max_tokens=200, stop=["<end_of_turn>"])
+[YOUR TASK]
+You are a friendly, professional on-device AI assistant.
+The user ({user_name}) has said: "{user_msg}"
+
+Provide a warm, polite, and concise conversational response (1 to 2 sentences).
+Address {user_name} by name.
+Politely indicate you are ready to answer questions about the loaded document or search the web.
+Do NOT output bullet points, document summaries, or unsolicited technical topics.
+
+[RESPONSE]
+<end_of_turn>
+<start_of_turn>model
+'''
+        response = self.llm(prompt=prompt, max_tokens=80, temperature=0.7, stop=["<end_of_turn>"])
         return {"final_answer": response["choices"][0]["text"].strip()}
 
     def transform_query_node(self, state: AgentState) -> dict:
-        print("--- Node: Transforming Query ---")
-        transformed_queries = self.query_transformer.transform_query(state.original_query)
-        all_queries = [state.original_query] + transformed_queries
-        print(f"Generated {len(all_queries)} queries.")
+        print("--- Node: Unified Anaphora Resolution & Query Transformation ---")
+        user_query = state.original_query
+        chat_context = state.summarized_history.strip() if state.summarized_history else ""
+
+        # Consolidated single-pass prompt for Anaphora Resolution + Multi-Query Generation
+        prompt = f'''<start_of_turn>user
+[YOUR TASK]
+You are a retrieval optimization assistant for an on-device technical search engine.
+Analyze the user's latest question in the context of recent chat exchanges.
+
+1. ANAPHORA RESOLUTION: If the question contains pronouns or implicit references (e.g. "he", "she", "it", "they", "this principle", "the author", "that company"), resolve them into explicit entity names based on the conversation history.
+2. MULTI-QUERY EXPANSION: Generate the resolved standalone query, followed by 2 distinct affirmative search query variations optimized for keyword (BM25) and semantic (vector) document retrieval.
+
+[RULES]
+- Output ONLY the search queries, one per line.
+- Do NOT output numbers, bullets, or conversational remarks.
+
+[CHAT HISTORY]
+{chat_context if chat_context else "No prior history."}
+
+[LATEST QUESTION]
+{user_query}
+
+[EXPANDED SEARCH QUERIES]
+<end_of_turn>
+<start_of_turn>model
+'''
+        try:
+            response = self.llm(prompt=prompt, max_tokens=150, temperature=0.3, stop=["<end_of_turn>"])
+            raw_text = response["choices"][0]["text"].strip()
+            lines = [re.sub(r'^\d+[\.\)]\s*|^[-*]\s*', '', l).strip() for l in raw_text.splitlines() if l.strip()]
+            generated_queries = [q for q in lines if len(q) > 3][:3]
+        except Exception as e:
+            print(f"Query transformation error: {e}")
+            generated_queries = []
+
+        all_queries = [user_query]
+        for q in generated_queries:
+            if q.lower() != user_query.lower() and q not in all_queries:
+                all_queries.append(q)
+
+        print(f"Generated {len(all_queries)} unified search queries (Primary: '{all_queries[0]}'):")
+        for i, q in enumerate(all_queries):
+            print(f"  {i+1}. {q}")
+
         return {"transformed_queries": all_queries}
 
     def retrieve_documents_node(self, state: AgentState) -> dict:
@@ -460,28 +470,50 @@ class RAGAgent:
         return {"final_answer": "I'm sorry, but I couldn't find a relevant answer in the document. I will now try a web search for you."}
 
     def web_search_node(self, state: AgentState) -> dict:
-        print("--- Node: Performing Web Search ---")
-        api_key = os.getenv("GOOGLE_API_KEY")
-        cse_id = os.getenv("SEARCH_ENGINE_ID")
-        if not api_key or not cse_id:
-            return {"final_answer": "Web search is not configured."}
+        print(f"--- Node: Performing Tiered Web Search for: '{state.original_query}' ---")
+        results, engine = hybrid_web_search(state.original_query, max_results=5)
+
+        if not results:
+            return {
+                "final_answer": f"I attempted to search the web for '{state.original_query}' using both DuckDuckGo and Google Search, but could not find verified information at this time."
+            }
+
+        snippets_text = "\n\n".join([
+            f"[{i+1}] {item['title']}\nSource: {item['link']}\nSnippet: {item['snippet']}"
+            for i, item in enumerate(results)
+        ])
+
+        summary_prompt = f'''<start_of_turn>user
+[YOUR TASK]
+You are a precise, factual research assistant.
+Answer the user's question using EXCLUSIVELY the verified search results provided below.
+
+[RULES]
+- Ground your answer 100% in the provided search results.
+- Do NOT use prior knowledge, unverified assumptions, or invent facts.
+- If the search results do not contain enough information to answer the question, clearly state that the search results were inconclusive.
+
+[QUESTION]
+{state.original_query}
+
+[VERIFIED WEB SEARCH RESULTS (via {engine})]
+{snippets_text}
+
+[ANSWER]
+<end_of_turn>
+<start_of_turn>model
+'''
         try:
-            service = build("customsearch", "v1", developerKey=api_key)
-            res = service.cse().list(q=state.original_query, cx=cse_id, num=3).execute()
-            if "items" not in res:
-                return {"final_answer": f"I couldn't find info for '{state.initial_query}' on the web."}
-            snippets = "\n\n".join([item.get('snippet', '') for item in res.get("items", [])])
-            summary_prompt = f'''<start_of_turn>user
-            Summarize these web search results to answer: '{state.original_query}'.
-            Results: {snippets}
-            Summary:<end_of_turn><start_of_turn>model
-            '''
-            summary_response = self.llm(prompt=summary_prompt, max_tokens=500, stop=["<end_of_turn>"])
+            summary_response = self.llm(prompt=summary_prompt, max_tokens=400, temperature=0.2, stop=["<end_of_turn>"])
             answer = summary_response["choices"][0]["text"].strip()
-            return {"final_answer": f"Here's what I found on the web:\n\n{answer}"}
+
+            # Format final answer with search engine badge and source links
+            links_list = "\n".join([f"- [{item['title']}]({item['link']})" for item in results[:3] if item.get('link')])
+            final_formatted = f"**Web Search Results (via {engine}):**\n\n{answer}\n\n**Sources:**\n{links_list}"
+            return {"final_answer": final_formatted}
         except Exception as e:
-            print(f"Error during web search: {e}")
-            return {"final_answer": "An error occurred during the web search."}
+            print(f"Error during web search synthesis: {e}")
+            return {"final_answer": f"Web search retrieved information via {engine}, but an error occurred while generating the summary."}
 
     def ingest_pdf_node(self, state: AgentState) -> dict:
         print(f"--- Node: Ingesting PDF: {state.original_query} ---")
@@ -533,9 +565,10 @@ class RAGAgent:
         consolidated_summary_response = self.llm(prompt=consolidated_summary_prompt, max_tokens=400, stop=["<end_of_turn>"])
         consolidated_summary = consolidated_summary_response["choices"][0]["text"].strip()
 
+        state.personalization_context["name"] = user_id
         state.personalization_context["past_interactions_summary"] = consolidated_summary
 
-        print(f"--- Profile Before Saving: Name='{state.personalization_context.get('name')}', Preferences={state.personalization_context.get('preferences')}, Summary='{state.personalization_context.get('past_interactions_summary')}' ---")
+        print(f"--- Profile Saved: User='{user_id}', Preferences={state.personalization_context.get('preferences')}, Summary='{state.personalization_context.get('past_interactions_summary')}' ---")
         self.profile_manager.save_profile(user_id, state.personalization_context)
         return {"chat_history": state.chat_history, "personalization_context": state.personalization_context}
 

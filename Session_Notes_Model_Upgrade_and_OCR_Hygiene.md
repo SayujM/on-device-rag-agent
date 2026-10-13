@@ -88,18 +88,65 @@ pdf_files/source/    pdf_files/quarantine/
 
 ---
 
-## 6. Files Modified / Created in this Session
+## 6. Tiered Hybrid Web Search & Anti-Hallucination Guardrail
+
+### The Issue
+*   When a user query was outside the source PDF document, the agent either failed due to missing Google credentials or misrouted into `generate_simple_response_node` where Gemma hallucinated an ungrounded answer from its parametric memory.
+*   Google Programmable Search Engine (CSE) has disabled open-web search for new standard engines, requiring complex domain whitelists.
+
+### The Solution: `web_searcher.py`
+We architected a resilient two-tier search strategy:
+*   **Tier 1 (Zero-Cost / Open Web):** Uses DuckDuckGo to query the entire live web without API keys or quota consumption.
+*   **Tier 2 (High-Reliability Google Failover):** The moment DuckDuckGo encounters rate-limiting (HTTP 429), throttling, or empty responses, it seamlessly fails over to **Serper.dev** (Google Full-Web API) using `SERPER_API_KEY`.
+*   **Anti-Hallucination Guardrails:**
+    1.  **Zero-Snippet Short-Circuit:** If both search engines return 0 results or are offline, the agent directly returns an honest, deterministic message without calling the LLM.
+    2.  **Strict Synthesis Prompt:** Enforced low temperature ($0.2$) with an explicit instruction: *"Answer using EXCLUSIVELY the verified search results. Do NOT invent facts or use prior ungrounded assumptions."*
+    3.  **Router Hardening:** `route_query_node` now restricts conversational routing strictly to polite greetings (hello, hi, who are you). Any factual inquiry outside the document is guaranteed to route to web search.
+    4.  **Attribution & Citations:** Formats final answers with a source engine badge (DuckDuckGo or Google Search) and clickable markdown links to source articles.
+
+---
+
+## 7. Pre-Retrieval DAG Streamlining & Anaphora Resolution
+
+### The "Liker" Entity Contamination Bug
+*   *Cause:* The legacy pipeline placed `extract_and_update_preferences` before query routing, forcing every single document question through an unconstrained extraction prompt. When a user asked *"What does Liker say about..."*, the model extracted `{"name": "Liker"}` and overwrote the authenticated username `Sayuj` in `user_profiles.db`.
+
+### The Architectural Solution
+1.  **Immutable User Identity:** `load_user_profile` and `update_history_and_profile` lock the user's name permanently to the authenticated session identity (`user_id = "Sayuj"`).
+2.  **Eliminated Dead & Fragile Nodes:** Removed `extract_and_update_preferences` and the redundant `contextualize_query` node from the execution path.
+3.  **Consolidated Anaphora Resolution & Multi-Query Expansion:** `transform_query_node` now performs pronoun/entity resolution from conversation history and expands into 3 distinct search variations in a **single, unified LLM pass**, saving 3–4 seconds per turn.
+4.  **Dynamic Mermaid Architecture Diagram:** Updated the LangGraph topology in `_build_graph()`. LangGraph's dynamic `app.get_graph().draw_mermaid()` renderer automatically reflects this revised, streamlined graph inside the Gradio UI's "Peek Inside the Brain" accordion.
+
+---
+
+## 8. Single-Pass Multi-Class Semantic Router
+
+### The Issue
+*   Sequential multi-step prompts (checking document relevance first, then checking conversational intent) caused Gemma to misclassify simple greetings like `"hi"` as `"maybe"` answerable by the book summary, triggering full document retrieval and dumping unsolicited chapter bullet points.
+*   Sequential prompts also compounded latency to 5–6 seconds per greeting.
+
+### The Solution
+*   **Unified Classification:** Replaced multi-step prompts and keyword regexes with a single-pass 3-way semantic classifier (`CHITCHAT`, `DOCUMENT_QA`, `WEB_SEARCH`).
+*   **Fast & Multilingual:** Gemma evaluates input semantically in ~200ms at temperature $0.0$, naturally routing natural variations (*"Hi"*, *"Hola"*, *"Namaste"*, *"How are you doing"*) to `conversational_query`.
+*   **Clean Conversational Synthesis:** In `generate_simple_response_node`, Gemma provides a warm, 1–2 sentence greeting addressing the user by name without unsolicited document lectures.
+
+---
+
+## 9. Files Modified / Created in this Session
 *   `config.py` *(New)*: Centralized system configuration.
 *   `pdf_validator.py` *(New)*: 4-gate ingestion hygiene gatekeeper.
 *   `test_ocr.py` *(New)*: Standalone OCR capability test suite.
-*   `index_all_pdfs.py` *(New)*: Automated batch indexer for ChromaDB and BM25.
-*   `pdf_processor.py` *(Updated)*: 200 DPI rendering, contrast preprocessing, de-hyphenation.
+*   `test_serper.py` *(New)*: Standalone Serper Google Full-Web API test suite.
+*   `web_searcher.py` *(New)*: Tiered hybrid web search engine (DuckDuckGo $\rightarrow$ Serper failover).
+*   `index_all_pdfs.py` *(New)*: Automated batch indexer for ChromaDB, BM25, and profile seeding.
+*   `pdf_processor.py` *(Updated)*: 200 DPI rendering, contrast preprocessing, de-hyphenation, decimal repair.
 *   `summary_generator.py` *(Updated)*: High-context Gemma 3 single-pass summarizer.
 *   `gemma_gguf_loader.py` *(Updated)*: Direct prompt & chat test with GPU offload.
 *   `query_transformer.py` *(Updated)*: Config-bound model loading with GPU support.
-*   `rag_agent_with_ui_v3.py` *(Updated)*: Dynamic summary loading and config integration.
-*   `requirements.txt` *(Updated)*: Streamlined active dependencies.
+*   `profile_manager.py` *(Updated)*: Added idempotent `close()` method for thread-safe callers.
+*   `rag_agent_with_ui_v3.py` *(Updated)*: Streamlined DAG, unified anaphora resolution, single-pass semantic router, dynamic Mermaid diagram, hybrid search, and anti-hallucination guardrails.
+*   `requirements.txt` *(Updated)*: Streamlined active dependencies with `duckduckgo-search`.
 *   `requirements.txt.bak` *(New)*: Complete pre-refactor backup.
 *   `pdf_summaries.json` *(Updated)*: Grounded topic summaries for all 6 chapters.
 *   `archive/pdf_summaries_old.json` *(New)*: Archived legacy summaries.
-*   `.gitignore` *(Updated)*: Excluded `*.gguf` and specific model weights.
+*   `.gitignore` *(Updated)*: Excluded `*.gguf`, model weights, and `rough_work/`.

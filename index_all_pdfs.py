@@ -34,6 +34,21 @@ def main():
     print("All PDFs indexed into ChromaDB & BM25 successfully!")
     print("=" * 60)
 
+    # Seed User Profile for Sayuj
+    print("\nSeeding user profile into SQLite database...")
+    import json
+    from profile_manager import ProfileManager
+    from config import PROFILE_DB_PATH, BASE_DIR
+
+    user_mem_path = os.path.join(BASE_DIR, "user_memory.json")
+    if os.path.exists(user_mem_path):
+        with open(user_mem_path, "r", encoding="utf-8") as f:
+            user_data = json.load(f)
+        pm = ProfileManager(PROFILE_DB_PATH)
+        pm.save_profile("Sayuj", user_data)
+        pm.close()
+        print(f"[PASS] User profile for 'Sayuj' seeded into: {PROFILE_DB_PATH}")
+
 
 if __name__ == "__main__":
     main()

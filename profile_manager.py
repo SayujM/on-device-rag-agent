@@ -56,3 +56,7 @@ class ProfileManager:
                 "INSERT OR REPLACE INTO user_profiles (user_id, profile_json) VALUES (?, ?)",
                 (user_id, profile_json)
             )
+
+    def close(self):
+        """Idempotent no-op for thread-safe callers."""
+        pass

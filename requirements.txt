@@ -31,6 +31,7 @@ llama-cpp-python==0.3.12
 pydantic==2.11.7
 python-dotenv==1.1.1
 google-api-python-client==2.176.0
+duckduckgo-search>=6.0.0
 
 
 # ==============================================================================
