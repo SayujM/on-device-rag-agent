@@ -3,19 +3,20 @@
 from llama_cpp import Llama
 import os
 import re
+from config import MODEL_PATH
 
 class QueryTransformer:
     """
     A class to handle the transformation of a user query into multiple,
     semantically different queries using a GGUF language model.
     """
-    def __init__(self, model_path: str, n_gpu_layers: int = 0, n_ctx: int = 2048):
+    def __init__(self, model_path: str = MODEL_PATH, n_gpu_layers: int = -1, n_ctx: int = 4096):
         """
         Initializes the QueryTransformer and loads the GGUF model.
 
         Args:
             model_path (str): The absolute path to the GGUF model file.
-            n_gpu_layers (int): Number of layers to offload to GPU. 0 for CPU-only.
+            n_gpu_layers (int): Number of layers to offload to GPU. -1 for GPU auto/all, 0 for CPU-only.
             n_ctx (int): The context window size for the model.
         """
         if not os.path.exists(model_path):

@@ -1,14 +1,22 @@
 # LLM VLM Model related files
+*.gguf
+gemma-3-4b-it-Q4_K_M.gguf
 gemma-3n-E4B-it-Q4_K_M.gguf
 llava-v1.5-7b-Q4_K_M.gguf
 llava-v1.5-7b-mmproj-model-f16.gguf
 
+# Gemini CLI related config files
+.gemini/
+GEMINI.md
+
 # Data folders to avoid
+rough_work/
 pdf_files/
 chroma_db/
 retrieval_cache/
 langgraph_checkpoints/
 temp_images/
+random/
 
 # Databases used in the program
 user_profiles.db
@@ -24,6 +32,7 @@ __pycache__/
 
 # Environments
 .env
+.env*
 .envrc
 .venv
 env/

@@ -25,9 +25,7 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 _hybrid_retriever_instance: HybridRetriever = None
 _embedding_model_instance = None
 """
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PDF_SOURCE_DIR = os.path.join(BASE_DIR, "pdf_files", "source")
-PDF_DESTINATION_BASE_DIR = os.path.join(BASE_DIR, "pdf_files", "destination")
+from config import BASE_DIR, PDF_SOURCE_DIR, PDF_DESTINATION_BASE_DIR
 
 def set_global_retriever_and_embedding_model(retriever: HybridRetriever, embedding_model):
     global _hybrid_retriever_instance

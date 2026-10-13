@@ -21,37 +21,26 @@ from retrieval_cache_v4 import RetrievalCache
 from embedding_model import load_embedding_model
 from profile_manager import ProfileManager
 import pdf_manager
+import config
 
 # Load environment variables from .env file
 load_dotenv()
 
-# --- Static Configuration & Summaries ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHECKPOINT_DIR = os.path.join(BASE_DIR, "langgraph_checkpoints")
+# --- Dynamic Configuration & Summaries ---
+BASE_DIR = config.BASE_DIR
+CHECKPOINT_DIR = config.CHECKPOINT_DIR
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-CHECKPOINT_DB_PATH = os.path.join(CHECKPOINT_DIR, "checkpoints.sqlite")
+CHECKPOINT_DB_PATH = config.CHECKPOINT_DB_PATH
 
-PDF_SUMMARIES = {
-    "ELECTRIC_CHARGES_AND_FIELDS.pdf": "Topics included: Electric charges and their properties, conductors and insulators, charging by induction, Coulomb's Law, the principle of superposition for forces between multiple charges, electric field, electric field lines, electric dipole, electric field due to a point charge, electric field due to an electric dipole (on axial and equatorial lines), torque on an electric dipole in a uniform electric field, continuous charge distribution (linear, surface, and volume charge density), Gauss's Law and its applications (electric field due to an infinitely long straight uniformly charged wire, uniformly charged infinite plane sheet, and uniformly charged thin spherical shell).",
-    "The-toyota-way-second-edition-00_chapter_preface.pdf": "Topics included: Introduction to the second edition of 'The Toyota Way', the evolution of Toyota and the book's content since the first edition, the concept of operational excellence as a strategic weapon, the enduring relevance of the Toyota Way principles for various organizations, and a brief overview of the book's structure and updated content, including new insights into Toyota's long-term thinking and adaptability.",
-    "The-toyota-way-second-edition-01_chapter_1.pdf": "Topics included: The Toyota Way philosophy, operational excellence, annual net income/loss of major automakers (Toyota, Ford, Volkswagen, General Motors, Honda) from 2004-2018, vehicle quality and long-term reliability ratings, the Toyota Production System (TPS), and scientific thinking as applied to problem-solving and continuous improvement within an organization.",
-    "The-toyota-way-second-edition-02_chapter_2.pdf": "Topics included: The Toyota Way 2001 values (Continuous Improvement and Respect for People), the Toyota Production System (TPS) as the operational system, historical context of TPS development (Kiichiro Toyoda, Eiji Toyoda, Taiichi Ohno), the two pillars of TPS: Just-in-Time (JIT) and Jidoka (automation with a human touch), Heijunka (production leveling), Standardized Work, Kaizen (continuous improvement), Lean manufacturing principles, and the evolution of the Toyota Way philosophy.",
-    "The-toyota-way-second-edition-03_chapter_3.pdf": "Topics included: Genchi Genbutsu (go and see for yourself) as a Toyota Way principle, practical application of Genchi Genbutsu for problem-solving and decision-making, the importance of understanding the 'gemba' (the actual place where work is done), examples of Toyota's leaders and their commitment to Genchi Genbutsu, the contrast between Toyota's approach and common Western management practices, Nemawashi (consensus building) and its role in decision-making, and A3 reports as a tool for structured problem-solving and communication.",
-    "The-toyota-way-second-edition-04_chapter_4.pdf": "Topics included: Creating continuous process flow to bring problems to the surface, the concept of one-piece flow, reducing work-in-process (WIP) inventory, linking processes and people for smooth flow, takt time as the rate of production needed to meet customer demand, and the benefits of flow in identifying waste and improving efficiency.",
-    "The-toyota-way-second-edition-05_chapter_5.pdf": "Topics included: Building a culture of stopping to fix problems to get quality right the first time (Jidoka), Andon cords/lights as a system to signal abnormalities, the importance of immediate problem-solving at the source, root cause analysis, and integrating quality control into every step of the process rather than inspecting at the end.",
-    "The-toyota-way-second-edition-06_chapter_6.pdf": "Topics included: Standardization as a foundation for continuous improvement and quality, the importance of stable processes, visual management, methods for creating and maintaining standards (e.g., standard work sheets), and how standardization supports problem-solving and training within the Toyota Production System.",
-    "The-toyota-way-second-edition-07_chapter_7.pdf": "Topics included: Using pull systems to avoid overproduction, Just-in-Time (JIT) production, the concept of kanban as a pull signal, the dangers of push systems and overproduction, inventory reduction as a way to expose problems, and how pull systems link processes based on actual customer demand.",
-    "The-toyota-way-second-edition-08_chapter_8.pdf": "Topics included: Building quality into the process (Jidoka principle), the concept of 'stop and fix' errors immediately, creating a culture where employees are empowered to halt production for quality issues, the importance of root cause analysis and permanent countermeasures, and examples of Toyota's commitment to quality at the source.",
-    "The-toyota-way-second-edition-09_chapter_9.pdf": "Topics included: Use of visual control to support people in decision-making and problem-solving, visual management principles, the importance of displaying information clearly and simply, examples of visual control systems (e.g., kanban, production boards), and how visual aids help identify abnormalities and facilitate immediate corrective action.",
-    "The-toyota-way-second-edition-10_chapter_10.pdf": "Topics included: Developing stable and reliable suppliers as an extension of the enterprise, long-term partnerships with suppliers, supplier development and continuous improvement, mutual learning and trust, and integrating suppliers into the Toyota Production System.",
-    "The-toyota-way-second-edition-11_chapter_11.pdf": "Topics included: Growing leaders from within who understand the work, live the philosophy, and teach it to others, the importance of developing people through daily work, creating a learning organization, and the role of humility and continuous self-improvement for leaders.",
-    "The-toyota-way-second-edition-12_chapter_12.pdf": "Topics included: Developing exceptional people and teams, the importance of continuous learning and growth for employees, creating leaders who live the philosophy, building a culture of respect and challenge, and the role of leadership in fostering a lean environment.",
-    "The-toyota-way-second-edition-13_chapter_13.pdf": "Topics included: Respecting and challenging value chain partners (suppliers and dealers), building long-term partnerships based on trust and mutual development, supplier selection and integration into the lean system, and helping partners improve their processes and capabilities to create a stable and efficient value chain.",
-    "The-toyota-way-second-edition-14_chapter_14.pdf": "Topics included: Scientific thinking and continuous learning through iterative problem-solving (PDCA cycle), the importance of deep observation and understanding the current condition, setting challenging targets and experimenting to achieve them, and developing a learning culture that embraces failures as opportunities for improvement.",
-    "The-toyota-way-second-edition-15_chapter_15.pdf": "Topics included: Hoshin Kanri (policy deployment) for aligning goals and ensuring systematic progress, the importance of long-term vision in planning, the catchball process for consensus building and communication across organizational levels, and how aligned goals drive continuous improvement throughout the enterprise.",
-    "The-toyota-way-second-edition-16_chapter_16.pdf": "Topics included: Learning your way to the future through bold strategy and combining large leaps with small steps, the balance between incremental innovation and disruptive innovation, Toyota's strategic approach to new technologies and market shifts, the importance of a long-term vision in guiding innovation efforts, and examples of strategic breakthroughs and challenges.",
-    "The-toyota-way-second-edition-17_chapter_conclusion.pdf": "Topics included: Sustaining a lean transformation and the Toyota Way principles, the challenge of integrating mechanistic and organic approaches to lean, the importance of leadership commitment and consistent effort, building a learning enterprise for continuous adaptation and improvement, and summary of key takeaways from The Toyota Way philosophy."
-}
+def get_pdf_summaries() -> dict:
+    """Dynamically loads PDF summaries from the JSON storage."""
+    if os.path.exists(config.PDF_SUMMARIES_PATH):
+        try:
+            with open(config.PDF_SUMMARIES_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not read {config.PDF_SUMMARIES_PATH}: {e}")
+    return {}
 
 # --- Agent State Definition ---
 class AgentState(BaseModel):
@@ -75,13 +64,13 @@ class AgentState(BaseModel):
 class RAGAgent:
     def __init__(self, selected_pdf_path: str, memory: SqliteSaver):
         print("--- Initializing RAG Agent ---")
-        self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        gguf_model_path = os.path.join(self.base_dir, "gemma-3n-E4B-it-Q4_K_M.gguf")
-        chroma_db_dir = os.path.join(self.base_dir, "chroma_db")
-        embedding_model_name = "all-MiniLM-L6-v2"
+        self.base_dir = config.BASE_DIR
+        gguf_model_path = config.MODEL_PATH
+        chroma_db_dir = config.CHROMA_DB_DIR
+        embedding_model_name = config.EMBEDDING_MODEL_NAME
 
         print("Loading Query Transformer and Embedding Model...")
-        self.query_transformer = QueryTransformer(model_path=gguf_model_path)
+        self.query_transformer = QueryTransformer(model_path=gguf_model_path, n_gpu_layers=-1, n_ctx=4096)
         self.llm = self.query_transformer.llm
         self.embedding_model = load_embedding_model(embedding_model_name)
 
@@ -109,11 +98,11 @@ class RAGAgent:
         )
 
         print("Initializing Profile Manager...")
-        profile_db_path = os.path.join(self.base_dir, "user_profiles.db")
+        profile_db_path = config.PROFILE_DB_PATH
         self.profile_manager = ProfileManager(db_path=profile_db_path)
 
         pdf_filename = os.path.basename(selected_pdf_path)
-        summary = PDF_SUMMARIES.get(pdf_filename, "No specific summary available.")
+        summary = get_pdf_summaries().get(pdf_filename, "No specific summary available.")
         self.initial_indexed_doc_summary = f"Accessing docs from '{pdf_filename}'. {summary}"
 
         print("Building and compiling the agent graph...")
@@ -504,7 +493,7 @@ class RAGAgent:
         paths = pdf_manager.get_pdf_output_dirs(pdf_name_without_ext)
         self.retrieval_cache = RetrievalCache(cache_dir=paths["retrieval_cache_dir"], embedding_model=self.embedding_model)
         pdf_filename = os.path.basename(pdf_path)
-        summary = PDF_SUMMARIES.get(pdf_filename, "No summary available.")
+        summary = get_pdf_summaries().get(pdf_filename, "No summary available.")
         updated_summary = f"Content from {pdf_filename} is now available. {summary}"
         return {"final_answer": f"Successfully ingested {pdf_filename}.", "indexed_document_summary": updated_summary}
 
@@ -579,7 +568,7 @@ class RAGInterface:
         self.memory = memory
 
     def _get_available_pdfs(self) -> List[str]:
-        source_dir = os.path.join(BASE_DIR, "pdf_files", "source")
+        source_dir = config.PDF_SOURCE_DIR
         if not os.path.exists(source_dir):
             os.makedirs(source_dir)
             return []
@@ -590,7 +579,7 @@ class RAGInterface:
             raise gr.Error("Please select a PDF and enter a User ID.")
         
         print(f"Starting session for user '{user_id}' with PDF '{pdf_filename}'")
-        pdf_path = os.path.join(BASE_DIR, "pdf_files", "source", pdf_filename)
+        pdf_path = os.path.join(config.PDF_SOURCE_DIR, pdf_filename)
         
         self.agent = RAGAgent(selected_pdf_path=pdf_path, memory=self.memory)
         self.user_id = user_id
@@ -636,8 +625,8 @@ class RAGInterface:
             print(f"Could not generate Mermaid diagram: {e}")
             mermaid_html = "<p>Could not render agent architecture diagram.</p>"
 
-        summary_raw = PDF_SUMMARIES.get(pdf_filename, "No topic summary available for this PDF.")
-        summary_clean = summary_raw.replace("Topics included: ", "")
+        summary_raw = get_pdf_summaries().get(pdf_filename, "No topic summary available for this PDF.")
+        summary_clean = summary_raw.replace("Topics included: ", "").replace("Summary of the PDF selected: ", "")
         formatted_summary = f"**Topics in this document:** {summary_clean}"
 
         return (
