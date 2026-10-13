@@ -38,11 +38,10 @@ def main():
     print("\nSeeding user profile into SQLite database...")
     import json
     from profile_manager import ProfileManager
-    from config import PROFILE_DB_PATH, BASE_DIR
+    from config import PROFILE_DB_PATH, USER_MEMORY_PATH
 
-    user_mem_path = os.path.join(BASE_DIR, "user_memory.json")
-    if os.path.exists(user_mem_path):
-        with open(user_mem_path, "r", encoding="utf-8") as f:
+    if os.path.exists(USER_MEMORY_PATH):
+        with open(USER_MEMORY_PATH, "r", encoding="utf-8") as f:
             user_data = json.load(f)
         pm = ProfileManager(PROFILE_DB_PATH)
         pm.save_profile("Sayuj", user_data)

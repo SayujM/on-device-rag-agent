@@ -25,42 +25,46 @@ This project implements an enterprise-grade, stateful **On-Device Retrieval-Augm
 
 ```
 on-device-rag-agent/
+├── README.md                         # Main project documentation
+├── requirements.txt                  # Active minimal dependencies
 ├── config.py                         # Centralized system paths, model names & database configs
-├── rag_agent_with_ui_v3.py           # Main application entrypoint & Gradio interface
+├── run_app.py                        # Clean application entrypoint launcher
+├── .env.example                      # Environment variable configuration template
+├── .gitignore                        # Excludes weights, checkpoints, rough_work
 │
-├── [ Ingestion & OCR Pipeline ]
-│   ├── pdf_validator.py              # 4-stage ingestion hygiene gatekeeper
-│   ├── pdf_processor.py              # 200 DPI OCR extraction & contrast preprocessing
-│   ├── pdf_manager.py                # Processing coordinator & artifact manager
-│   ├── summary_generator.py          # High-context Gemma 3 single-pass chapter summarizer
+├── src/                              # Core Application Source Code
+│   ├── ingestion/                    # PDF parsing, OCR, and validation
+│   │   ├── pdf_validator.py          # 4-stage ingestion hygiene gatekeeper
+│   │   ├── pdf_processor.py          # 200 DPI OCR extraction & contrast preprocessing
+│   │   ├── pdf_manager.py            # Processing coordinator & artifact manager
+│   │   ├── text_chunker.py           # Recursive sentence-aware character text splitter
+│   │   └── text_utils.py             # Case-folding tokenizer & stop-word cleaner
+│   ├── retrieval/                    # Search, vector DB, and caching
+│   │   ├── hybrid_retriever_v4.py    # Consensus RRF hybrid search (Dense + Sparse)
+│   │   ├── bm25_indexer_v4.py        # BM25 sparse indexer & serializer
+│   │   ├── vector_db.py              # ChromaDB client & collection manager
+│   │   ├── retrieval_cache_v4.py     # Semantic vector cache for low-latency repeat queries
+│   │   └── web_searcher.py           # Tiered hybrid search (DuckDuckGo -> Serper Google)
+│   ├── models/                       # Model wrappers and user state
+│   │   ├── embedding_model.py        # SentenceTransformer (all-MiniLM-L6-v2) loader
+│   │   ├── query_transformer.py      # Paraphrasing & query expansion module
+│   │   └── profile_manager.py        # Thread-safe SQLite user memory manager
+│   └── agent/                        # LangGraph workflow & Gradio UI
+│       └── rag_agent_with_ui_v3.py   # Stateful RAG engine & Gradio dashboard
+│
+├── scripts/                          # Pipeline & Maintenance Scripts
 │   ├── index_all_pdfs.py             # Batch pre-indexer for ChromaDB & BM25
-│   ├── text_chunker.py               # Recursive sentence-aware character text splitter
-│   └── text_utils.py                 # Case-folding tokenizer & stop-word cleaner
+│   └── summary_generator.py          # High-context Gemma 3 single-pass chapter summarizer
 │
-├── [ Hybrid Retrieval & Search ]
-│   ├── hybrid_retriever_v4.py        # Consensus RRF hybrid search (Dense + Sparse)
-│   ├── bm25_indexer_v4.py            # BM25 sparse indexer & serializer
-│   ├── vector_db.py                  # ChromaDB client & collection manager
-│   ├── retrieval_cache_v4.py         # Semantic vector cache for low-latency repeat queries
-│   └── web_searcher.py               # Tiered hybrid search (DuckDuckGo -> Serper Google)
-│
-├── [ Models & Personalization ]
-│   ├── embedding_model.py            # SentenceTransformer (all-MiniLM-L6-v2) loader
-│   ├── query_transformer.py          # Paraphrasing & query expansion module
-│   ├── profile_manager.py            # Thread-safe SQLite user memory manager
-│   └── gemma_gguf_loader.py          # Standalone GGUF model loading & generation test
-│
-├── [ Verification & Testing ]
+├── tests/                            # Verification & Diagnostic Test Suites
 │   ├── test_ocr.py                   # Standalone Tesseract & PIL OCR verification test
-│   └── test_serper.py                # Standalone Serper Google Full-Web API test
+│   ├── test_serper.py                # Standalone Serper Google Full-Web API test
+│   └── gemma_gguf_loader.py          # Standalone GGUF model load test
 │
-├── [ Configuration & Data ]
-│   ├── requirements.txt              # Active minimal dependencies
-│   ├── requirements.txt.bak          # Full pre-refactor environment backup
+├── data/                             # Metadata & Seed Knowledge Bases
 │   ├── pdf_summaries.json            # Grounded topic summaries for source chapters
 │   ├── user_memory.json              # Seed personalization profile for user Sayuj
-│   ├── .env.example                  # Environment variable configuration template
-│   └── .gitignore                    # Excludes weights, checkpoints, rough_work
+│   └── user_profiles.db              # SQLite user profiles
 │
 ├── docs/                             # Dedicated documentation & architectural notes
 │   ├── Session_Notes_Model_Upgrade_and_OCR_Hygiene.md
@@ -128,7 +132,7 @@ SERPER_API_KEY="your_serper_api_key_here"
 ### 1. Stage and Validate Documents
 Drop any PDF into `pdf_files/staging/` and run the hygiene audit:
 ```bash
-python3 pdf_validator.py
+python3 src/ingestion/pdf_validator.py
 ```
 *   Healthy files are automatically promoted to `pdf_files/source/`.
 *   Corrupt, encrypted, or invalid files are isolated into `pdf_files/quarantine/` with an audit JSON.
@@ -137,16 +141,16 @@ python3 pdf_validator.py
 To generate high-context chapter summaries using Gemma 3 4B:
 ```bash
 # Summarize newly added source PDFs
-python3 summary_generator.py
+python3 scripts/summary_generator.py
 
 # Or force re-generation for all source files
-python3 summary_generator.py --force
+python3 scripts/summary_generator.py --force
 ```
 
 ### 3. Pre-Index Documents & Seed Profile
 Pre-build ChromaDB vector collections, BM25 indices, and seed user memory:
 ```bash
-python3 index_all_pdfs.py
+python3 scripts/index_all_pdfs.py
 ```
 
 ---
@@ -155,7 +159,7 @@ python3 index_all_pdfs.py
 
 Launch the interactive Gradio RAG Agent:
 ```bash
-python3 rag_agent_with_ui_v3.py
+python3 run_app.py
 ```
 
 1.  Open your browser at **`http://127.0.0.1:7860`** (or use the generated public live link).
